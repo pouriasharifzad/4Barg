@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@drawable/paper_background">
+
+    <TextView
+        android:id="@+id/roomNumberTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="شماره روم: "
+        android:textColor="@color/white"
+        android:textSize="18sp"
+        android:layout_margin="8dp"/>
+
+    <TextView
+        android:id="@+id/minExperienceTextView"
+        android:layout_width="wrap_content"
+        android:textColor="@color/white"
+        android:layout_height="wrap_content"
+        android:text="حداقل تجربه: "
+        android:textSize="16sp"
+        android:layout_margin="8dp"/>
+
+    <TextView
+        android:id="@+id/minCoinsTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/white"
+        android:text="حداقل سکه: "
+        android:textSize="16sp"
+        android:layout_margin="8dp"/>
+
+    <TextView
+        android:id="@+id/maxPlayersTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="حداکثر بازیکن: "
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:layout_margin="8dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/playerRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_margin="8dp"/>
+
+    <TextView
+        android:id="@+id/countdownTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="شروع بازی در: 3"
+        android:textColor="@color/white"
+        android:textSize="20sp"
+        android:layout_margin="8dp"
+        android:visibility="gone"/> <!-- به‌صورت پیش‌فرض مخفی است -->
+
+    <Button
+        android:id="@+id/exitRoomButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="خروج از روم"
+        android:layout_margin="8dp"/>
+
+    <Button
+        android:id="@+id/startGameButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="شروع بازی"
+        android:layout_margin="8dp"
+        android:enabled="false"
+    android:visibility="gone"/>
+
+</LinearLayout>

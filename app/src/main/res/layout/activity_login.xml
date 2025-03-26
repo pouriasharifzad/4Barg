@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="16dp"
+    android:background="@drawable/paper_background">
+
+    <!-- لوگو یا عنوان (اختیاری، با تم قبلی) -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ورود به بازی"
+        android:textSize="28sp"
+        android:textColor="#FFFFFF"
+        android:gravity="center"
+        android:layout_marginBottom="32dp"/>
+
+    <!-- فیلدهای مشترک لاگین -->
+    <EditText
+        android:id="@+id/email"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="ایمیل"
+        android:gravity="center"
+        android:inputType="textEmailAddress"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#80FFFFFF"
+        android:backgroundTint="#65D165"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/password"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="رمز عبور"
+        android:gravity="center"
+        android:inputType="textPassword"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#80FFFFFF"
+        android:backgroundTint="#00FF00"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- بخش ثبت‌نام (پیش‌فرض مخفی) -->
+    <LinearLayout
+        android:id="@+id/registerSection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/username"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="نام کاربری"
+            android:gravity="center"
+            android:inputType="text"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#80FFFFFF"
+            android:backgroundTint="#00FF00"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp"/>
+
+    </LinearLayout>
+
+    <!-- دکمه لاگین -->
+    <Button
+        android:id="@+id/loginButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ورود"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#3B6F3B"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- دکمه تغییر به ثبت‌نام -->
+    <TextView
+        android:id="@+id/toggleRegister"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="حساب ندارید؟ ثبت‌نام کنید"
+        android:textSize="16sp"
+        android:textColor="#00FF00"
+        android:gravity="center"
+        android:layout_gravity="center"
+        android:padding="8dp"/>
+
+</LinearLayout>

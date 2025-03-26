@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@color/cardview_shadow_start_color"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/roomNumberTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="شماره روم"
+        android:textColor="@color/white"
+        android:padding="5dp"
+        android:layout_margin="5dp"
+        android:gravity="center"
+        android:background="@color/cardview_dark_background"
+        android:textSize="16sp"/>
+
+    <TextView
+        android:id="@+id/playerCountTextView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="0/3"
+        android:textColor="@color/white"
+        android:padding="5dp"
+        android:gravity="center"
+        android:layout_margin="5dp"
+        android:textSize="16sp"
+        android:background="@color/cardview_dark_background"
+        />
+
+</LinearLayout>

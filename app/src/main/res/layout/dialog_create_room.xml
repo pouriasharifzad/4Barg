@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ساخت روم جدید"
+        android:textSize="20sp"
+        android:layout_gravity="center"/>
+
+    <EditText
+        android:id="@+id/minExperienceEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="حداقل تجربه"
+        android:text="1"
+        android:inputType="number"
+        android:gravity="center"
+        android:layout_marginTop="8dp"/>
+
+    <EditText
+        android:id="@+id/minCoinsEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="حداقل سکه"
+        android:text="1"
+        android:inputType="number"
+        android:gravity="center"
+        android:layout_marginTop="8dp"/>
+
+    <EditText
+        android:id="@+id/maxPlayersEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="حداکثر بازیکن‌ها"
+        android:text="3"
+        android:gravity="center"
+        android:inputType="number"
+        android:layout_marginTop="8dp"/>
+
+    <Button
+        android:id="@+id/createRoomDialogButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ساخت روم"
+        android:layout_marginTop="16dp"/>
+
+</LinearLayout>

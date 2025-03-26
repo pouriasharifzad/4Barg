@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:id="@+id/layout"
+    android:layout_height="match_parent"
+    android:background="@drawable/paper_background">
+
+
+
+    <TextView
+        android:id="@+id/player1_cards"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:text="N/A"
+        android:elevation="5dp"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView"
+        app:layout_constraintVertical_bias="0.505" />
+
+
+    <TextView
+        android:id="@+id/player2_cards"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:elevation="5dp"
+
+        android:text="N/A"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView"
+        app:layout_constraintVertical_bias="0.505" />
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="236dp"
+        android:layout_height="446dp"
+        android:background="@drawable/rect_table"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.497"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.221" />
+
+    <LinearLayout
+        android:id="@+id/played_cards_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView"
+        app:layout_constraintVertical_bias="0.5">
+
+        <!-- کارت‌ها اینجا داینامیک اضافه می‌شوند -->
+    </LinearLayout>
+
+    <!-- دسته کارت‌ها (بالای میز، سمت راست، با ImageView به‌جای TextView) -->
+    <androidx.cardview.widget.CardView
+
+        android:layout_width="50dp"
+        android:layout_height="80dp"
+        app:cardBackgroundColor="#D3D3D3"
+        app:cardElevation="4dp"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintHorizontal_bias="0.701"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView"
+        app:layout_constraintVertical_bias="0.117">
+
+        <ImageView
+            android:id="@+id/deck"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/card_back"
+            android:scaleType="fitCenter" />
+    </androidx.cardview.widget.CardView>
+
+    <!-- باکس بازیکن 1 (چپ) -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#1F1B1B"
+        android:gravity="center"
+        android:padding="5dp"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toStartOf="@+id/imageView"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/imageView">
+
+        <ImageView
+            android:id="@+id/player1_avatar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_default_avatar" />
+
+        <TextView
+            android:id="@+id/player1_username"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UserName" />
+
+        <TextView
+            android:id="@+id/player1_exp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EXP" />
+
+        <TextView
+            android:id="@+id/player1_coins"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Coins" />
+    </LinearLayout>
+
+    <!-- باکس بازیکن 2 (راست) -->
+    <LinearLayout
+        android:id="@+id/linearLayout2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#1F1B1B"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="5dp"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView">
+
+        <ImageView
+            android:id="@+id/player2_avatar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_default_avatar" />
+
+        <TextView
+            android:id="@+id/player2_username"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UserName" />
+
+        <TextView
+            android:id="@+id/player2_exp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EXP" />
+
+        <TextView
+            android:id="@+id/player2_coins"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Coins" />
+    </LinearLayout>
+
+    <!-- باکس کاربر (پایین) -->
+    <LinearLayout
+        android:id="@+id/linearLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#1F1B1B"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="5dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageView"
+        app:layout_constraintVertical_bias="0.855">
+
+        <ImageView
+            android:id="@+id/user_avatar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_default_avatar" />
+
+        <TextView
+            android:id="@+id/user_username"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UserName" />
+
+        <TextView
+            android:id="@+id/user_exp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EXP" />
+
+        <TextView
+            android:id="@+id/user_coins"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Coins" />
+    </LinearLayout>
+
+    <!-- دست کاربر (با HandView سفارشی) -->
+
+    <com.example.a4Barg.utils.HandView
+        android:id="@+id/handView"
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:elevation="8dp"
+        android:background="@android:color/transparent"
+        app:layout_constraintBottom_toTopOf="@+id/linearLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageView"
+        app:layout_constraintVertical_bias="1.0"/>
+</androidx.constraintlayout.widget.ConstraintLayout>
