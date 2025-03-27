@@ -66,7 +66,6 @@ public class LobbyActivity extends BaseActivity {
 
         EditText minExperienceEditText = dialogView.findViewById(R.id.minExperienceEditText);
         EditText minCoinsEditText = dialogView.findViewById(R.id.minCoinsEditText);
-        EditText maxPlayersEditText = dialogView.findViewById(R.id.maxPlayersEditText);
         Button createRoomDialogButton = dialogView.findViewById(R.id.createRoomDialogButton);
 
         AlertDialog dialog = builder.create();
@@ -74,18 +73,16 @@ public class LobbyActivity extends BaseActivity {
         createRoomDialogButton.setOnClickListener(v -> {
             String minExperienceStr = minExperienceEditText.getText().toString().trim();
             String minCoinsStr = minCoinsEditText.getText().toString().trim();
-            String maxPlayersStr = maxPlayersEditText.getText().toString().trim();
 
-            if (minExperienceStr.isEmpty() || minCoinsStr.isEmpty() || maxPlayersStr.isEmpty()) {
+            if (minExperienceStr.isEmpty() || minCoinsStr.isEmpty()) {
                 Toast.makeText(this, "لطفاً همه فیلدها را پر کنید", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             int minExperience = Integer.parseInt(minExperienceStr);
             int minCoins = Integer.parseInt(minCoinsStr);
-            int maxPlayers = Integer.parseInt(maxPlayersStr);
 
-            viewModel.createRoom(minExperience, minCoins, maxPlayers);
+            viewModel.createRoom(minExperience, minCoins);
             dialog.dismiss();
         });
 

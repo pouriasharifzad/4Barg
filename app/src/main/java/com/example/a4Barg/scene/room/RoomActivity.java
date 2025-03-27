@@ -18,7 +18,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.common.BaseActivity;
-
 import com.example.a4Barg.networking.SocketManager;
 import com.example.a4Barg.scene.game.GameActivity;
 import com.example.a4Barg.scene.lobby.LobbyActivity;
@@ -39,12 +38,10 @@ public class RoomActivity extends BaseActivity {
     private TextView roomNumberTextView;
     private TextView minExperienceTextView;
     private TextView minCoinsTextView;
-    private TextView maxPlayersTextView;
     private TextView countdownTextView;
     private String roomNumber;
     private String userId;
     private boolean isHost = false;
-    private int maxPlayers = 0;
     private CountDownTimer countDownTimer;
 
     @Override
@@ -73,7 +70,6 @@ public class RoomActivity extends BaseActivity {
         roomNumberTextView = findViewById(R.id.roomNumberTextView);
         minExperienceTextView = findViewById(R.id.minExperienceTextView);
         minCoinsTextView = findViewById(R.id.minCoinsTextView);
-        maxPlayersTextView = findViewById(R.id.maxPlayersTextView);
         countdownTextView = findViewById(R.id.countdownTextView);
         startGameButton = findViewById(R.id.startGameButton);
 
@@ -84,21 +80,18 @@ public class RoomActivity extends BaseActivity {
                     String roomNum = room.has("roomNumber") ? room.getString("roomNumber") : "نامشخص";
                     int minExp = room.has("minExperience") ? room.getInt("minExperience") : 0;
                     int minCoin = room.has("minCoins") ? room.getInt("minCoins") : 0;
-                    maxPlayers = room.has("maxPlayers") ? room.getInt("maxPlayers") : 0;
 
                     if (room.has("hostId")) {
                         String hostId = room.getString("hostId");
                         isHost = userId.equals(hostId);
                         Log.d("TEST", "User isHost: " + isHost + ", userId: " + userId + ", hostId: " + hostId);
-
                         startGameButton.setVisibility(isHost ? View.VISIBLE : View.GONE);
                     }
 
                     roomNumberTextView.setText("شماره روم: " + roomNum);
                     minExperienceTextView.setText("حداقل تجربه: " + minExp);
                     minCoinsTextView.setText("حداقل سکه: " + minCoin);
-                    maxPlayersTextView.setText("ظرفیت: " + maxPlayers);
-                    Log.d("TEST", "Room details updated: roomNumber=" + roomNum + ", minExperience=" + minExp + ", minCoins=" + minCoin + ", maxPlayers=" + maxPlayers);
+                    Log.d("TEST", "Room details updated: roomNumber=" + roomNum + ", minExperience=" + minExp + ", minCoins=" + minCoin);
 
                     updateStartGameButtonState();
                 } catch (JSONException e) {
@@ -176,10 +169,10 @@ public class RoomActivity extends BaseActivity {
     }
 
     private void updateStartGameButtonState() {
-        if (viewModel.getPlayers().getValue() != null && maxPlayers > 0) {
+        if (viewModel.getPlayers().getValue() != null) {
             int currentPlayers = viewModel.getPlayers().getValue().size();
-            startGameButton.setEnabled(currentPlayers == maxPlayers);
-            Log.d("TEST", "Start game button state updated: currentPlayers=" + currentPlayers + ", maxPlayers=" + maxPlayers + ", enabled=" + startGameButton.isEnabled());
+            startGameButton.setEnabled(currentPlayers == 2); // ظرفیت ثابت 2 نفر
+            Log.d("TEST", "Start game button state updated: currentPlayers=" + currentPlayers + ", maxPlayers=2, enabled=" + startGameButton.isEnabled());
         }
     }
 
@@ -215,17 +208,17 @@ public class RoomActivity extends BaseActivity {
                 try {
                     String receivedRoomNumber = data.getString("roomNumber");
                     if (receivedRoomNumber.equals(roomNumber)) {
-                        startCountdown();
+                        runOnUiThread(() -> startCountdown());
+
                     }
                 } catch (JSONException e) {
-                    runOnUiThread(() -> Toast.makeText(RoomActivity.this, "خطا در پردازش پیام بارگذاری بازی", Toast.LENGTH_SHORT).show()); }
+                    runOnUiThread(() -> Toast.makeText(RoomActivity.this, "خطا در پردازش پیام بارگذاری بازی", Toast.LENGTH_SHORT).show());
+                }
             }
 
             @Override
             public void onGameLoadingError(Throwable t) {
-                runOnUiThread(() -> {
-                    showToast(t.getMessage());
-                });
+                runOnUiThread(() -> showToast(t.getMessage()));
             }
         });
     }

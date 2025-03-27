@@ -33,15 +33,6 @@
         android:gravity="center"
         android:layout_marginTop="8dp"/>
 
-    <EditText
-        android:id="@+id/maxPlayersEditText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="حداکثر بازیکن‌ها"
-        android:text="3"
-        android:gravity="center"
-        android:inputType="number"
-        android:layout_marginTop="8dp"/>
 
     <Button
         android:id="@+id/createRoomDialogButton"

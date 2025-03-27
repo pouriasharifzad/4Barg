@@ -618,19 +618,6 @@ public class SocketManager {
         });
     }
 
-    public static void listenForChooseSuit(ChooseSuitListener listener) {
-        socket.on("choose_suit", args -> {
-            Log.d("TEST", "Received choose_suit: " + (args[0] != null ? args[0].toString() : "null"));
-            try {
-                JSONObject data = (JSONObject) args[0];
-                listener.onChooseSuit(data);
-            } catch (Exception e) {
-                Log.d("TEST", "Error in choose_suit: " + e.getMessage());
-                listener.onChooseSuitError(e);
-            }
-        });
-    }
-
     public static void listenForGameEnded(GameEndedListener listener) {
         socket.on("game_ended", args -> {
             Log.d("TEST", "Received game_ended: " + (args[0] != null ? args[0].toString() : "null"));

@@ -30,7 +30,6 @@ public class LobbyViewModel extends AndroidViewModel {
             @Override
             public void onRoomListUpdate(JSONObject roomListData) {
                 Log.d("TEST", "Room list updated: " + roomListData.toString());
-                // اینجا می‌تونی لیست روم‌ها رو توی یه LiveData ذخیره کنی و به UI اطلاع بدی
                 message.postValue("لیست روم‌ها آپدیت شد: " + roomListData.toString());
             }
 
@@ -54,12 +53,13 @@ public class LobbyViewModel extends AndroidViewModel {
         return isLoading;
     }
 
-    public void createRoom(int minExperience, int minCoins, int maxPlayers) {
+    // حذف maxPlayers از پارامترها و ثابت کردنش روی 2
+    public void createRoom(int minExperience, int minCoins) {
         isLoading.setValue(true);
         Map<String, Object> dataMap = new HashMap<>();
         dataMap.put("minExperience", minExperience);
         dataMap.put("minCoins", minCoins);
-        dataMap.put("maxPlayers", maxPlayers);
+        dataMap.put("maxPlayers", 2); // ظرفیت ثابت 2 نفر
         dataMap.put("userId", userId);
         dataMap.put("event", "create_room");
 
@@ -75,10 +75,9 @@ public class LobbyViewModel extends AndroidViewModel {
                         Intent intent = new Intent(getApplication(), RoomActivity.class);
                         intent.putExtra("userId", userId);
                         intent.putExtra("roomNumber", object.getString("roomNumber"));
-                        // فرض می‌کنیم این فیلدها توی پاسخ سرور وجود دارن
                         intent.putExtra("minExperience", object.optInt("minExperience", minExperience));
                         intent.putExtra("minCoins", object.optInt("minCoins", minCoins));
-                        intent.putExtra("maxPlayers", object.optInt("maxPlayers", maxPlayers));
+                        intent.putExtra("maxPlayers", 2); // ثابت 2 نفر
                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         getApplication().startActivity(intent);
                     } else {
@@ -98,6 +97,4 @@ public class LobbyViewModel extends AndroidViewModel {
             message.postValue("خطا در پردازش داده‌ها");
         }
     }
-
-
 }
