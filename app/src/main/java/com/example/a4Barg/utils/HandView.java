@@ -18,11 +18,11 @@ public class HandView extends FrameLayout {
     private List<Card> cardModels = new ArrayList<>();
     private boolean showCards = true; // برای کنترل نمایش رو یا پشت کارت‌ها
 
-    private final int overlap = 60;
-    private final int angleFactor = 12;
-    private final int cardHeight = 180;
+    private final int overlap = 85;
+    private final int angleFactor = 5;
+    private final int cardHeight = 138;
     private final int padding = 10;
-    private final int curveFactor = 65;
+    private final int curveFactor = 30;
 
     public HandView(Context context, AttributeSet attrs) {
         super(context, attrs);

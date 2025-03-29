@@ -16,7 +16,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import io.socket.client.Socket;
+import io.socket.emitter.Emitter;
 
+import java.util.ArrayList;
+import java.util.List;
 
 public class SocketManager {
 
@@ -25,10 +28,78 @@ public class SocketManager {
     public static Boolean isRequestCompleted = false;
     static Context context;
 
+    // لیست شنونده‌های سراسری برای player_cards
+    private static final List<PlayerCardsListener> playerCardsListeners = new ArrayList<>();
+
+    // متد جدید برای مقداردهی اولیه سوکت با userId
+    public static void initialize(Context context, String userId) {
+        SocketManager.context = context;
+        socket = App.shared.getSocket();
+        socket.connect();
+        socket.emit("set_user_id", userId); // ارسال userId به سرور
+        socket.on(Socket.EVENT_CONNECT, args -> {
+            Log.d("Socket", "Connected with userId: " + userId);
+            isConnect = true;
+            initializeGlobalListeners(); // فراخوانی بعد از اتصال موفق
+        });
+        socket.on(Socket.EVENT_CONNECT_ERROR, args -> {
+            Log.e("Socket", "Connection error: " + (args[0] != null ? args[0].toString() : "unknown error"));
+            isConnect = false;
+        });
+        socket.on(Socket.EVENT_DISCONNECT, args -> {
+            Log.d("Socket", "Disconnected: " + (args.length > 0 ? args[0].toString() : "unknown reason"));
+            isConnect = false;
+        });
+    }
+
+    // متد برای اضافه کردن شنونده‌ها
+    public static void addPlayerCardsListener(PlayerCardsListener listener) {
+        playerCardsListeners.add(listener);
+    }
+
+    // متد برای حذف شنونده‌ها (اختیاری، برای مدیریت بهتر)
+    public static void removePlayerCardsListener(PlayerCardsListener listener) {
+        playerCardsListeners.remove(listener);
+    }
+
+    // ثبت شنونده سراسری در زمان راه‌اندازی
+    public static void initializeGlobalListeners() {
+        socket.on("player_cards", args -> {
+            Log.d("TEST", "Received player_cards event globally: " + (args[0] != null ? args[0].toString() : "null"));
+            try {
+                JSONObject data = (JSONObject) args[0];
+                Handler mainHandler = new Handler(Looper.getMainLooper());
+                mainHandler.post(() -> {
+                    for (PlayerCardsListener listener : playerCardsListeners) {
+                        listener.onPlayerCards(data);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e("TEST", "Error parsing player_cards globally: " + e.getMessage());
+                Handler mainHandler = new Handler(Looper.getMainLooper());
+                mainHandler.post(() -> {
+                    for (PlayerCardsListener listener : playerCardsListeners) {
+                        listener.onPlayerCardsError(e);
+                    }
+                });
+            }
+        });
+
+        // اضافه کردن لاگ برای همه رویدادهای دریافتی با تگ "Socket"
+        socket.onAnyIncoming(new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                String eventName = args[0].toString();
+                String data = args.length > 1 ? args[1].toString() : "No data";
+                Log.d("Socket", "[Client] Received event: " + eventName + ", Data: " + data);
+            }
+        });
+    }
+
+    // بقیه متدها بدون تغییر باقی می‌مونن
     public interface Response {
         void onResponse(JSONObject object, Boolean isError) throws JSONException;
         void onError(Throwable t);
-
     }
 
     public interface RoomListUpdateListener {
@@ -49,6 +120,12 @@ public class SocketManager {
     public interface RoomDeletedListener {
         void onRoomDeleted(JSONObject data);
         void onRoomDeletedError(Throwable t);
+    }
+
+    // اضافه کردن اینترفیس جدید برای اطلاعات بازیکن‌ها
+    public interface GamePlayersInfoListener {
+        void onGamePlayersInfo(JSONObject data);
+        void onGamePlayersInfoError(Throwable t);
     }
 
     public interface GameStartListener {
@@ -158,7 +235,6 @@ public class SocketManager {
         }
     }
 
-    // متد جدید برای ارسال درخواست game_loading
     public static void sendGameLoadingRequest(Context context, SocketRequest request, Response response) throws JSONException {
         SocketManager.context = context;
 
@@ -181,7 +257,6 @@ public class SocketManager {
             return;
         }
 
-        // بررسی و رفرش توکن در صورت نیاز
         verifyToken(context, token, new Response() {
             @Override
             public void onResponse(JSONObject object, Boolean isError) throws JSONException {
@@ -396,7 +471,6 @@ public class SocketManager {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("token", token);
         jsonObject.put("requestId", String.valueOf(RandomInteger.getRandomId()));
-        // به جای تبدیل context به Activity، از null برای پارامتر activity استفاده می‌کنیم
         SocketRequest request = new SocketRequest(null, jsonObject, response);
         Log.d("TEST", "Preparing verifyToken request: " + jsonObject.toString());
         socket.emit("verify_token", jsonObject);
@@ -571,9 +645,10 @@ public class SocketManager {
             Log.d("TEST", "Received game_started: " + (args[0] != null ? args[0].toString() : "null"));
             try {
                 JSONObject data = (JSONObject) args[0];
+                Log.d("TEST", "Calling onGameStart with data: " + data.toString());
                 listener.onGameStart(data);
             } catch (Exception e) {
-                Log.d("TEST", "Error in game_started: " + e.getMessage());
+                Log.e("TEST", "Error in game_started: " + e.getMessage());
                 listener.onGameStartError(e);
             }
         });
@@ -593,27 +668,17 @@ public class SocketManager {
     }
 
     public static void listenForGameStateUpdates(GameStateUpdateListener listener) {
+        Handler mainHandler = new Handler(Looper.getMainLooper());
         socket.on("game_state_update", args -> {
-            Log.d("TEST", "Received game_state_update: " + (args[0] != null ? args[0].toString() : "null"));
+            Log.d("TEST", "Received game_state_update event: " + (args[0] != null ? args[0].toString() : "null"));
             try {
                 JSONObject data = (JSONObject) args[0];
-                listener.onGameStateUpdate(data);
+                Log.d("TEST", "Parsed game_state_update data: " + data.toString());
+                Log.d("TEST", "Calling onGameStateUpdate with data: " + data.toString());
+                mainHandler.post(() -> listener.onGameStateUpdate(data));
             } catch (Exception e) {
-                Log.d("TEST", "Error in game_state_update: " + e.getMessage());
-                listener.onGameStateUpdateError(e);
-            }
-        });
-    }
-
-    public static void listenForPlayerCards(PlayerCardsListener listener) {
-        socket.on("player_cards", args -> {
-            Log.d("TEST", "Received player_cards: " + (args[0] != null ? args[0].toString() : "null"));
-            try {
-                JSONObject data = (JSONObject) args[0];
-                listener.onPlayerCards(data);
-            } catch (Exception e) {
-                Log.d("TEST", "Error in player_cards: " + e.getMessage());
-                listener.onPlayerCardsError(e);
+                Log.e("TEST", "Error parsing game_state_update: " + e.getMessage());
+                mainHandler.post(() -> listener.onGameStateUpdateError(e));
             }
         });
     }
@@ -629,5 +694,40 @@ public class SocketManager {
                 listener.onGameEndedError(e);
             }
         });
+    }
+
+    // متد جدید برای درخواست اطلاعات بازیکن‌ها
+    public static void getGamePlayersInfo(Context context, String gameId, String userId, GamePlayersInfoListener listener) {
+        JSONObject data = new JSONObject();
+        try {
+            data.put("event", "get_game_players_info");
+            data.put("gameId", gameId);
+            data.put("userId", userId);
+        } catch (JSONException e) {
+            listener.onGamePlayersInfoError(e);
+            return;
+        }
+
+        try {
+            SocketRequest request = new SocketRequest(null, data, new Response() {
+                @Override
+                public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    if (!isError && object.getBoolean("success")) {
+                        listener.onGamePlayersInfo(object);
+                    } else {
+                        String errorMsg = object.has("message") ? object.getString("message") : "خطا در دریافت اطلاعات بازیکن‌ها";
+                        listener.onGamePlayersInfoError(new IllegalArgumentException(errorMsg));
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    listener.onGamePlayersInfoError(t);
+                }
+            });
+            sendRequest(context, request);
+        } catch (JSONException e) {
+            listener.onGamePlayersInfoError(e);
+        }
     }
 }

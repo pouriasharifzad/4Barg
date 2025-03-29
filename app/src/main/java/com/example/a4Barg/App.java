@@ -3,6 +3,8 @@ package com.example.a4Barg;
 import android.app.Application;
 import android.util.Log;
 
+import com.example.a4Barg.networking.SocketManager;
+
 import java.net.URISyntaxException;
 
 import io.socket.client.IO;
@@ -17,6 +19,7 @@ public class App extends Application {
         super.onCreate();
         shared = this; // مقداردهی اولیه singleton
         initializeSocket(); // مقداردهی اولیه سوکت
+        SocketManager.initializeGlobalListeners();
     }
 
     private void initializeSocket() {
