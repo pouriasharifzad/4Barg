@@ -30,6 +30,8 @@ public class SocketManager {
 
     // لیست شنونده‌های سراسری برای player_cards
     private static final List<PlayerCardsListener> playerCardsListeners = new ArrayList<>();
+    // لیست جدید برای شنونده‌های get_game_players_info
+    private static final List<GamePlayersInfoListener> gamePlayersInfoListeners = new ArrayList<>();
 
     // متد جدید برای مقداردهی اولیه سوکت با userId
     public static void initialize(Context context, String userId) {
@@ -52,7 +54,7 @@ public class SocketManager {
         });
     }
 
-    // متد برای اضافه کردن شنونده‌ها
+    // متد برای اضافه کردن شنونده‌ها برای player_cards
     public static void addPlayerCardsListener(PlayerCardsListener listener) {
         playerCardsListeners.add(listener);
     }
@@ -60,6 +62,11 @@ public class SocketManager {
     // متد برای حذف شنونده‌ها (اختیاری، برای مدیریت بهتر)
     public static void removePlayerCardsListener(PlayerCardsListener listener) {
         playerCardsListeners.remove(listener);
+    }
+
+    // متد جدید برای اضافه کردن شنونده‌ها برای get_game_players_info
+    public static void addGamePlayersInfoListener(GamePlayersInfoListener listener) {
+        gamePlayersInfoListeners.add(listener);
     }
 
     // ثبت شنونده سراسری در زمان راه‌اندازی
@@ -80,6 +87,28 @@ public class SocketManager {
                 mainHandler.post(() -> {
                     for (PlayerCardsListener listener : playerCardsListeners) {
                         listener.onPlayerCardsError(e);
+                    }
+                });
+            }
+        });
+
+        // اضافه کردن شنونده برای get_game_players_info_response
+        socket.on("get_game_players_info_response", args -> {
+            Log.d("TEST", "Received get_game_players_info_response globally: " + (args[0] != null ? args[0].toString() : "null"));
+            try {
+                JSONObject data = (JSONObject) args[0];
+                Handler mainHandler = new Handler(Looper.getMainLooper());
+                mainHandler.post(() -> {
+                    for (GamePlayersInfoListener listener : gamePlayersInfoListeners) {
+                        listener.onGamePlayersInfo(data);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e("TEST", "Error parsing get_game_players_info_response globally: " + e.getMessage());
+                Handler mainHandler = new Handler(Looper.getMainLooper());
+                mainHandler.post(() -> {
+                    for (GamePlayersInfoListener listener : gamePlayersInfoListeners) {
+                        listener.onGamePlayersInfoError(e);
                     }
                 });
             }
@@ -683,19 +712,6 @@ public class SocketManager {
         });
     }
 
-    public static void listenForGameEnded(GameEndedListener listener) {
-        socket.on("game_ended", args -> {
-            Log.d("TEST", "Received game_ended: " + (args[0] != null ? args[0].toString() : "null"));
-            try {
-                JSONObject data = (JSONObject) args[0];
-                listener.onGameEnded(data);
-            } catch (Exception e) {
-                Log.d("TEST", "Error in game_ended: " + e.getMessage());
-                listener.onGameEndedError(e);
-            }
-        });
-    }
-
     // متد جدید برای درخواست اطلاعات بازیکن‌ها
     public static void getGamePlayersInfo(Context context, String gameId, String userId, GamePlayersInfoListener listener) {
         JSONObject data = new JSONObject();
@@ -704,7 +720,7 @@ public class SocketManager {
             data.put("gameId", gameId);
             data.put("userId", userId);
         } catch (JSONException e) {
-            listener.onGamePlayersInfoError(e);
+            if (listener != null) listener.onGamePlayersInfoError(e);
             return;
         }
 
@@ -712,9 +728,9 @@ public class SocketManager {
             SocketRequest request = new SocketRequest(null, data, new Response() {
                 @Override
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
-                    if (!isError && object.getBoolean("success")) {
+                    if (!isError && object.getBoolean("success") && listener != null) {
                         listener.onGamePlayersInfo(object);
-                    } else {
+                    } else if (listener != null) {
                         String errorMsg = object.has("message") ? object.getString("message") : "خطا در دریافت اطلاعات بازیکن‌ها";
                         listener.onGamePlayersInfoError(new IllegalArgumentException(errorMsg));
                     }
@@ -722,12 +738,12 @@ public class SocketManager {
 
                 @Override
                 public void onError(Throwable t) {
-                    listener.onGamePlayersInfoError(t);
+                    if (listener != null) listener.onGamePlayersInfoError(t);
                 }
             });
             sendRequest(context, request);
         } catch (JSONException e) {
-            listener.onGamePlayersInfoError(e);
+            if (listener != null) listener.onGamePlayersInfoError(e);
         }
     }
 }

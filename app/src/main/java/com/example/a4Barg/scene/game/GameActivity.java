@@ -166,10 +166,10 @@ public class GameActivity extends AppCompatActivity {
                         gameId = data.getString("gameId");
                         Log.d("TEST", "Game started - gameId: " + gameId);
                         viewModel.requestPlayerCards(gameId);
-                        if (!playersInfoRequested) { // فقط یه بار درخواست بفرست
+                        if (!playersInfoRequested) {
                             Log.d("TEST", "Requesting game players info for gameId: " + gameId);
-                            viewModel.requestGamePlayersInfo(gameId);
-                            SocketManager.getGamePlayersInfo(GameActivity.this, gameId, userId, new SocketManager.GamePlayersInfoListener() {
+                            SocketManager.getGamePlayersInfo(GameActivity.this, gameId, userId, null); // درخواست رو بفرست
+                            SocketManager.addGamePlayersInfoListener(new SocketManager.GamePlayersInfoListener() {
                                 @Override
                                 public void onGamePlayersInfo(JSONObject data) {
                                     Log.d("TEST", "onGamePlayersInfo called with data: " + data.toString());
@@ -196,7 +196,7 @@ public class GameActivity extends AppCompatActivity {
                                                 }
                                             });
                                         }
-                                        playersInfoRequested = true; // درخواست انجام شده
+                                        playersInfoRequested = true;
                                     } catch (JSONException e) {
                                         Log.e("TEST", "Error parsing game_players_info data: " + e.getMessage());
                                     }

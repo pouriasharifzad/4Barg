@@ -150,8 +150,8 @@
 
     <com.example.a4Barg.utils.HandView
         android:id="@+id/user_handView"
-        android:layout_width="match_parent"
-        android:layout_height="300dp"
+        android:layout_width="413dp"
+        android:layout_height="521dp"
         android:background="@android:color/transparent"
         android:elevation="8dp"
         app:layout_constraintBottom_toTopOf="@+id/linearLayout"
@@ -159,12 +159,12 @@
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/imageView"
-        app:layout_constraintVertical_bias="0.617" />
+        app:layout_constraintVertical_bias="0.811" />
 
     <com.example.a4Barg.utils.HandView
         android:id="@+id/opponent_handView"
-        android:layout_width="match_parent"
-        android:layout_height="300dp"
+        android:layout_width="413dp"
+        android:layout_height="203dp"
         android:background="@android:color/transparent"
         android:elevation="8dp"
         android:rotationX="180"
