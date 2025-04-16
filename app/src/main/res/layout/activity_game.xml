@@ -202,6 +202,50 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <Button
+        android:id="@+id/btnInGameMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="پیام دادن"
+        app:layout_constraintBottom_toBottomOf="@+id/user_handView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_bias="0.498"
+        app:layout_constraintHorizontal_bias="0.8"
+        app:layout_constraintStart_toEndOf="@+id/linearLayout"
+        app:layout_constraintTop_toBottomOf="@+id/imageView" />
+
+    <TextView
+        android:id="@+id/tvUserInGameMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#DCDBD3"
+        android:padding="5dp"
+        android:textColor="#140F0F"
+        android:text="UserMessage"
+        android:layout_marginBottom="10dp"
+        android:textSize="20sp"
+        android:visibility="gone"
+        android:elevation="16dp"
+        app:layout_constraintBottom_toBottomOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/tvOpponentInGameMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="#DCDBD3"
+        android:padding="5dp"
+        android:elevation="20sp"
+        android:text="UserMessage"
+        android:textColor="#140F0F"
+        android:visibility="gone"
+        android:textSize="20sp"
+        android:layout_marginTop="10dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/table_view" />
+
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

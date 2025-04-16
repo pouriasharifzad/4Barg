@@ -97,6 +97,10 @@ public class LoginViewModel extends ViewModel {
             status.setValue("رمز عبور را وارد کنید");
             return;
         }
+        if (password.length() < 6) {
+            status.setValue("رمز عبور باید حداقل 6 کاراکتر باشد");
+            return;
+        }
 
         Map<String, String> dataMap = new HashMap<>();
         dataMap.put("username", username);

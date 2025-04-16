@@ -20,6 +20,13 @@
         android:text="پیوستن به اتاق"
         android:layout_below="@id/createRoomButton"
         android:layout_margin="16dp"/>
+    <Button
+        android:id="@+id/ProfileSettingsButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="تنظیمات پروفایل"
+        android:layout_below="@id/joinRoomButton"
+        android:layout_margin="16dp"/>
 
 
 

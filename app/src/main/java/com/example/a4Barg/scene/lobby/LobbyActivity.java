@@ -15,13 +15,14 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.common.BaseActivity;
+import com.example.a4Barg.scene.profile.ProfileSettingsActivity;
 import com.example.a4Barg.scene.room.RoomActivity;
 import com.example.a4Barg.scene.roomlist.RoomListActivity;
 
 public class LobbyActivity extends BaseActivity {
 
     private LobbyViewModel viewModel;
-    private Button createRoomButton, joinRoomButton;
+    private Button createRoomButton, joinRoomButton , profileButton;
     private ProgressBar progressBar;
 
     @Override
@@ -34,6 +35,7 @@ public class LobbyActivity extends BaseActivity {
         viewModel.setUserId(userId);
 
         createRoomButton = findViewById(R.id.createRoomButton);
+        profileButton = findViewById(R.id.ProfileSettingsButton);
         joinRoomButton = findViewById(R.id.joinRoomButton);
         progressBar = findViewById(R.id.progressBar);
 
@@ -57,7 +59,10 @@ public class LobbyActivity extends BaseActivity {
             intent.putExtra("userId", userId);
             startActivity(intent);
         });
+
+        profileButton.setOnClickListener(v -> startIntent(new Intent(LobbyActivity.this, ProfileSettingsActivity.class)));
     }
+
 
     private void showCreateRoomDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);

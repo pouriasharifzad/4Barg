@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F5F5">
+
+    <!-- حالت لودینگ -->
+    <ProgressBar
+        android:id="@+id/loading_progress_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:visibility="visible" />
+
+    <!-- محتوای اصلی -->
+    <ScrollView
+        android:id="@+id/content_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F5F5F5"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:layoutDirection="rtl"
+            android:textDirection="rtl">
+
+            <!-- هدر صفحه -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="تنظیمات پروفایل"
+                android:textSize="24sp"
+                android:textColor="#333333"
+                android:gravity="center"
+                android:paddingBottom="16dp" />
+
+            <!-- عکس پروفایل -->
+            <ImageView
+                android:id="@+id/iv_profile_pic"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_default_avatar"
+                android:contentDescription="عکس پروفایل" />
+
+            <Button
+                android:id="@+id/btn_change_pic"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="تغییر عکس"
+                android:textSize="16sp"
+                android:padding="8dp"
+                android:layout_marginTop="8dp" />
+
+            <!-- نام کاربری -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="نام کاربری:"
+                android:textSize="18sp"
+                android:textColor="#666666"
+                android:layout_marginTop="16dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/et_username"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="نام کاربری"
+                    android:textSize="16sp"
+                    android:padding="8dp"
+                    android:textColorHint="#3C3333"
+                    android:background="@drawable/edit_text_background"
+                    android:maxLength="20" />
+
+                <Button
+                    android:id="@+id/btn_edit_username"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ویرایش"
+                    android:textSize="14sp"
+                    android:padding="4dp"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
+
+            <!-- ایمیل -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ایمیل:"
+                android:textSize="18sp"
+                android:textColor="#666666"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:id="@+id/tv_email"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="example@email.com"
+                android:textSize="16sp"
+                android:padding="8dp"
+                android:background="@drawable/text_view_background"
+                android:textColor="#333333"
+                android:enabled="false" />
+
+            <!-- تجربه کاربر -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="تجربه (XP):"
+                android:textSize="18sp"
+                android:textColor="#666666"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:id="@+id/tv_experience"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="16sp"
+                android:padding="8dp"
+                android:background="@drawable/text_view_background"
+                android:textColor="#333333" />
+
+            <!-- سکه‌ها -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="سکه‌ها:"
+                android:textSize="18sp"
+                android:textColor="#666666"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:id="@+id/tv_coins"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="16sp"
+                android:padding="8dp"
+                android:background="@drawable/text_view_background"
+                android:textColor="#333333" />
+
+            <!-- دکمه ذخیره -->
+            <Button
+                android:id="@+id/btn_save"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="ذخیره تغییرات"
+                android:textSize="16sp"
+                android:padding="12dp"
+                android:layout_marginTop="24dp"
+                android:backgroundTint="#4CAF50"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

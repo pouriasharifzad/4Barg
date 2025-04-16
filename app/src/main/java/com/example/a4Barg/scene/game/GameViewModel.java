@@ -11,6 +11,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.a4Barg.model.Card;
+import com.example.a4Barg.model.InGameMessage; // جدید
 import com.example.a4Barg.model.SocketRequest;
 import com.example.a4Barg.networking.SocketManager;
 
@@ -44,6 +45,7 @@ public class GameViewModel extends AndroidViewModel {
     private final MutableLiveData<Integer> opponentScore = new MutableLiveData<>(0);
     private final MutableLiveData<String> winner = new MutableLiveData<>();
     private final MutableLiveData<String> gameResultText = new MutableLiveData<>("");
+    private final MutableLiveData<InGameMessage> inGameMessage = new MutableLiveData<>(); // جدید
     private Card pendingCard;
     private boolean playersInfoRequested = false;
 
@@ -156,7 +158,6 @@ public class GameViewModel extends AndroidViewModel {
                             tableCards.setValue(new ArrayList<>());
                         }
                         gameOver.setValue(true);
-                        // گرفتن امتیازات و برنده و تنظیم متن برای TextView
                         if (data.has("scores") && data.has("winner")) {
                             JSONArray scores = data.getJSONArray("scores");
                             int userScoreValue = 0, opponentScoreValue = 0;
@@ -179,9 +180,8 @@ public class GameViewModel extends AndroidViewModel {
                                     "بازی تموم شد!\nامتیاز شما: %d\nامتیاز حریف: %d\n%s",
                                     userScoreValue, opponentScoreValue, winnerMessage
                             );
-                            gameResultText.setValue(resultText); // تنظیم متن برای TextView
+                            gameResultText.setValue(resultText);
 
-                            // لاگ کردن کارت‌های خاص با تگ "score"
                             List<Card> userCards = userCollectedCards.getValue();
                             List<Card> opponentCards = opponentCollectedCards.getValue();
                             int userSursCount = userSurs.getValue() != null ? userSurs.getValue() : 0;
@@ -190,7 +190,6 @@ public class GameViewModel extends AndroidViewModel {
                             StringBuilder userLog = new StringBuilder("User Collected Cards (Scoring):\n");
                             StringBuilder opponentLog = new StringBuilder("Opponent Collected Cards (Scoring):\n");
 
-                            // کارت‌های خاج
                             if (userCards != null) {
                                 userLog.append("Clubs: ");
                                 for (Card card : userCards) {
@@ -210,7 +209,6 @@ public class GameViewModel extends AndroidViewModel {
                                 opponentLog.append("\n");
                             }
 
-                            // کارت 10 خشت
                             if (userCards != null) {
                                 userLog.append("10 of Diamonds: ");
                                 for (Card card : userCards) {
@@ -230,7 +228,6 @@ public class GameViewModel extends AndroidViewModel {
                                 opponentLog.append("\n");
                             }
 
-                            // کارت‌های آس
                             if (userCards != null) {
                                 userLog.append("Aces: ");
                                 for (Card card : userCards) {
@@ -250,7 +247,6 @@ public class GameViewModel extends AndroidViewModel {
                                 opponentLog.append("\n");
                             }
 
-                            // کارت‌های سرباز
                             if (userCards != null) {
                                 userLog.append("Jacks: ");
                                 for (Card card : userCards) {
@@ -270,7 +266,6 @@ public class GameViewModel extends AndroidViewModel {
                                 opponentLog.append("\n");
                             }
 
-                            // تعداد سورها
                             userLog.append("Surs: ").append(userSursCount).append("\n");
                             opponentLog.append("Surs: ").append(opponentSursCount).append("\n");
 
@@ -433,6 +428,20 @@ public class GameViewModel extends AndroidViewModel {
                 }
             }
         });
+
+        // گوش دادن به پیام‌های دریافتی (جدید)
+        SocketManager.addCustomListener("receive_in_game_message", new SocketManager.CustomListener() {
+            @Override
+            public void onEvent(JSONObject data) {
+                try {
+                    String senderUserId = data.getString("userId");
+                    String message = data.getString("message");
+                    inGameMessage.setValue(new InGameMessage(senderUserId, message));
+                } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing in-game message: " + e.getMessage());
+                }
+            }
+        });
     }
 
     public void playCard(Card card, List<Card> tableCardsToCollect) {
@@ -467,6 +476,33 @@ public class GameViewModel extends AndroidViewModel {
         }
     }
 
+    // ارسال پیام به سرور (جدید)
+    public void sendInGameMessage(String message) {
+        JSONObject data = new JSONObject();
+        try {
+            data.put("event", "send_in_game_message");
+            data.put("gameId", gameId);
+            data.put("userId", userId);
+            data.put("message", message);
+            SocketRequest request = new SocketRequest(null, data, new SocketManager.Response() {
+                @Override
+                public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    if (!isError && object.getBoolean("success")) {
+                        inGameMessage.setValue(new InGameMessage(userId, message)); // نمایش پیام برای خود کاربر
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    Log.e("GameViewModel", "Error sending in-game message: " + t.getMessage());
+                }
+            });
+            SocketManager.sendRequest(getApplication(), request);
+        } catch (JSONException e) {
+            Log.e("GameViewModel", "Error creating message JSON: " + e.getMessage());
+        }
+    }
+
     public LiveData<List<Card>> getUserCards() { return userCards; }
     public LiveData<Integer> getOpponentCardCount() { return opponentCardCount; }
     public LiveData<List<Card>> getTableCards() { return tableCards; }
@@ -483,5 +519,6 @@ public class GameViewModel extends AndroidViewModel {
     public LiveData<Integer> getOpponentScore() { return opponentScore; }
     public LiveData<String> getWinner() { return winner; }
     public LiveData<String> getGameResultText() { return gameResultText; }
+    public LiveData<InGameMessage> getInGameMessage() { return inGameMessage; } // جدید
     public Card getPendingCard() { return pendingCard; }
 }

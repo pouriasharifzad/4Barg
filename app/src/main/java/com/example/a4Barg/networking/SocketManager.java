@@ -2,6 +2,7 @@ package com.example.a4Barg.networking;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -17,10 +18,16 @@ import org.json.JSONObject;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public class SocketManager {
 
@@ -33,6 +40,7 @@ public class SocketManager {
     private static final List<GamePlayersInfoListener> gamePlayersInfoListeners = new ArrayList<>();
     private static final List<TurnUpdateListener> turnUpdateListeners = new ArrayList<>();
     private static final Map<String, List<CustomListener>> customListeners = new HashMap<>();
+    private static final Set<String> pendingRequests = new HashSet<>(); // برای جلوگیری از درخواست‌های تکراری
 
     public static void initialize(Context context, String userId) {
         SocketManager.context = context;
@@ -44,6 +52,17 @@ public class SocketManager {
             Log.d("TEST", "Socket connected on init");
             isConnect = true;
             initializeGlobalListeners();
+            addCustomListener("avatar_status", data -> {
+                try {
+                    Log.d("TEST", "Received avatar_status: " + data.toString());
+                    Handler mainHandler = new Handler(Looper.getMainLooper());
+                    mainHandler.post(() -> {
+                        // اینجا می‌تونی منطق اضافی برای پردازش رویداد اضافه کنی
+                    });
+                } catch (Exception e) {
+                    Log.e("TEST", "Error in avatar_status listener: " + e.getMessage());
+                }
+            });
         });
         socket.on(Socket.EVENT_CONNECT_ERROR, args -> {
             Log.e("TEST", "Socket connection error: " + (args[0] != null ? args[0].toString() : "unknown error"));
@@ -163,7 +182,6 @@ public class SocketManager {
         });
     }
 
-    // متد تستی برای چک کردن اتصال سوکت
     public static void testSocketConnection(Context context, String userId) {
         reconnectIfNeeded();
         if (!socket.connected() || !isConnect) {
@@ -261,6 +279,11 @@ public class SocketManager {
         void onEvent(JSONObject data);
     }
 
+    public interface UploadCallback {
+        void onSuccess();
+        void onError(String error);
+    }
+
     public static void addRequest(SocketRequest request) {
         ConsValue.socketRequestList.add(request);
         Log.d("TEST", "Request added to queue: " + request.getJsonObject().toString());
@@ -278,7 +301,24 @@ public class SocketManager {
         String token = prefs.getString("token", null);
         String event = request.getJsonObject().getString("event");
 
+        // تولید یک کلید منحصر به فرد برای درخواست بر اساس event و requestId
+        String requestId = request.getJsonObject().optString("id", UUID.randomUUID().toString());
+        String requestKey = event + "_" + requestId;
+
+        // بررسی اینکه آیا درخواست قبلاً در حال پردازش است
+        synchronized (pendingRequests) {
+            if (pendingRequests.contains(requestKey)) {
+                Log.d("TEST", "Duplicate request detected, skipping: " + requestKey);
+                request.getResponse().onError(new IllegalArgumentException("درخواست تکراری: " + event));
+                return;
+            }
+            pendingRequests.add(requestKey);
+        }
+
         if (token == null && !event.equals("login") && !event.equals("register")) {
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             request.getResponse().onError(new IllegalArgumentException("توکن احراز هویت موجود نیست"));
             return;
         }
@@ -286,6 +326,9 @@ public class SocketManager {
         final long TIMEOUT_MS = 10000;
         final Handler timeoutHandler = new Handler(Looper.getMainLooper());
         final Runnable timeoutRunnable = () -> {
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             request.getResponse().onError(new IllegalArgumentException("درخواست منقضی شد: پاسخی از سرور دریافت نشد"));
             socket.off("message");
             socket.off("login_response");
@@ -303,6 +346,9 @@ public class SocketManager {
 
         socket.once(Socket.EVENT_CONNECT_ERROR, args -> {
             timeoutHandler.removeCallbacks(timeoutRunnable);
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             request.getResponse().onError(new IllegalArgumentException("خطای اتصال: " + (args[0] != null ? args[0].toString() : "unknown error")));
         });
 
@@ -316,7 +362,7 @@ public class SocketManager {
             if (!event.equals("login") && !event.equals("register")) {
                 requestData.put("token", token);
             }
-            emitRequest(event, requestData, request, timeoutHandler, timeoutRunnable);
+            emitRequest(event, requestData, request, timeoutHandler, timeoutRunnable, requestKey);
         } else {
             String id = String.valueOf(RandomInteger.getRandomId());
             request.getJsonObject().put("id", id);
@@ -326,7 +372,7 @@ public class SocketManager {
             if (token != null) {
                 requestData.put("token", token);
             }
-            emitRequest(event, requestData, request, timeoutHandler, timeoutRunnable);
+            emitRequest(event, requestData, request, timeoutHandler, timeoutRunnable, requestKey);
         }
     }
 
@@ -347,6 +393,18 @@ public class SocketManager {
             return;
         }
 
+        String requestId = request.getJsonObject().optString("id", UUID.randomUUID().toString());
+        String requestKey = event + "_" + requestId;
+
+        synchronized (pendingRequests) {
+            if (pendingRequests.contains(requestKey)) {
+                Log.d("TEST", "Duplicate game loading request detected, skipping: " + requestKey);
+                response.onError(new IllegalArgumentException("درخواست تکراری: " + event));
+                return;
+            }
+            pendingRequests.add(requestKey);
+        }
+
         verifyToken(context, token, new Response() {
             @Override
             public void onResponse(JSONObject object, Boolean isError) throws JSONException {
@@ -359,34 +417,46 @@ public class SocketManager {
                                 SharedPreferences.Editor editor = prefs.edit();
                                 editor.putString("token", newToken);
                                 editor.apply();
-                                proceedWithGameLoading(context, request, response, newToken);
+                                proceedWithGameLoading(context, request, response, newToken, requestKey);
                             } else {
+                                synchronized (pendingRequests) {
+                                    pendingRequests.remove(requestKey);
+                                }
                                 response.onError(new IllegalArgumentException("خطا در رفرش توکن"));
                             }
                         }
 
                         @Override
                         public void onError(Throwable t) {
+                            synchronized (pendingRequests) {
+                                pendingRequests.remove(requestKey);
+                            }
                             response.onError(t);
                         }
                     });
                 } else {
-                    proceedWithGameLoading(context, request, response, token);
+                    proceedWithGameLoading(context, request, response, token, requestKey);
                 }
             }
 
             @Override
             public void onError(Throwable t) {
+                synchronized (pendingRequests) {
+                    pendingRequests.remove(requestKey);
+                }
                 response.onError(t);
             }
         });
     }
 
-    private static void proceedWithGameLoading(Context context, SocketRequest request, Response response, String token) throws JSONException {
+    private static void proceedWithGameLoading(Context context, SocketRequest request, Response response, String token, String requestKey) throws JSONException {
         String event = request.getJsonObject().getString("event");
         final long TIMEOUT_MS = 10000;
         final Handler timeoutHandler = new Handler(Looper.getMainLooper());
         final Runnable timeoutRunnable = () -> {
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             response.onError(new IllegalArgumentException("درخواست منقضی شد: پاسخی از سرور دریافت نشد"));
             socket.off("game_loading_response");
         };
@@ -394,6 +464,9 @@ public class SocketManager {
 
         socket.once(Socket.EVENT_CONNECT_ERROR, args -> {
             timeoutHandler.removeCallbacks(timeoutRunnable);
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             response.onError(new IllegalArgumentException("خطای اتصال: " + (args[0] != null ? args[0].toString() : "unknown error")));
         });
 
@@ -408,6 +481,9 @@ public class SocketManager {
         socket.emit(event, requestData);
         socket.once("game_loading_response", args -> {
             timeoutHandler.removeCallbacks(timeoutRunnable);
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             JSONObject object = (JSONObject) args[0];
             try {
                 boolean success = object.has("success") && object.getBoolean("success");
@@ -424,11 +500,14 @@ public class SocketManager {
         });
     }
 
-    private static void emitRequest(String event, JSONObject requestData, SocketRequest request, Handler timeoutHandler, Runnable timeoutRunnable) {
+    private static void emitRequest(String event, JSONObject requestData, SocketRequest request, Handler timeoutHandler, Runnable timeoutRunnable, String requestKey) {
         socket.emit(event, requestData);
         String responseEvent = event + "_response";
         socket.once(responseEvent, args -> {
             timeoutHandler.removeCallbacks(timeoutRunnable);
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             Log.d("TEST", "Response received for event: " + responseEvent + ", Data: " + args[0].toString());
             handleResponse(responseEvent, args, request);
         });
@@ -457,7 +536,8 @@ public class SocketManager {
                 if (event.equals("login_response") || event.equals("register_response") ||
                         event.equals("create_room_response") || event.equals("join_room_response") ||
                         event.equals("leave_room_response") || event.equals("get_room_list_response") ||
-                        event.equals("game_loading_response") || event.equals("play_card_response")) {
+                        event.equals("game_loading_response") || event.equals("play_card_response") ||
+                        event.equals("get_profile_response") || event.equals("update_profile_response")) {
                     if (success) {
                         if (event.equals("login_response") || event.equals("register_response")) {
                             ConsValue.isRegistered = true;
@@ -488,6 +568,9 @@ public class SocketManager {
                             ConsValue.socketRequestList.remove(request);
                         }
                     }
+                } else {
+                    Log.e("SocketManager", "Unhandled response event: " + event);
+                    request.getResponse().onError(new IllegalArgumentException("رویداد ناشناخته: " + event));
                 }
             } catch (JSONException e) {
                 request.getResponse().onError(e);
@@ -502,12 +585,26 @@ public class SocketManager {
             return;
         }
 
+        String requestKey = "verify_token_" + token.hashCode();
+
+        synchronized (pendingRequests) {
+            if (pendingRequests.contains(requestKey)) {
+                Log.d("TEST", "Duplicate verify_token request detected, skipping: " + requestKey);
+                response.onError(new IllegalArgumentException("درخواست تکراری: verify_token"));
+                return;
+            }
+            pendingRequests.add(requestKey);
+        }
+
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("token", token);
         jsonObject.put("requestId", String.valueOf(RandomInteger.getRandomId()));
         SocketRequest request = new SocketRequest(null, jsonObject, response);
         socket.emit("verify_token", jsonObject);
         socket.once("verify_token_response", args -> {
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             JSONObject object = (JSONObject) args[0];
             try {
                 response.onResponse(object, false);
@@ -515,7 +612,12 @@ public class SocketManager {
                 response.onError(e);
             }
         });
-        socket.once(Socket.EVENT_CONNECT_ERROR, args -> response.onError(new IllegalArgumentException("اتصال برقرار نشد")));
+        socket.once(Socket.EVENT_CONNECT_ERROR, args -> {
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
+            response.onError(new IllegalArgumentException("اتصال برقرار نشد"));
+        });
     }
 
     public static void refreshToken(Context context, JSONObject requestData, Response response) {
@@ -525,8 +627,22 @@ public class SocketManager {
             return;
         }
 
+        String requestKey = "refresh_token_" + requestData.hashCode();
+
+        synchronized (pendingRequests) {
+            if (pendingRequests.contains(requestKey)) {
+                Log.d("TEST", "Duplicate refresh_token request detected, skipping: " + requestKey);
+                response.onError(new IllegalArgumentException("درخواست تکراری: refresh_token"));
+                return;
+            }
+            pendingRequests.add(requestKey);
+        }
+
         socket.emit("refresh_token", requestData);
         socket.once("refresh_token_response", args -> {
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
             JSONObject object = (JSONObject) args[0];
             try {
                 response.onResponse(object, false);
@@ -534,7 +650,12 @@ public class SocketManager {
                 response.onError(e);
             }
         });
-        socket.once(Socket.EVENT_CONNECT_ERROR, args -> response.onError(new IllegalArgumentException("اتصال برقرار نشد")));
+        socket.once(Socket.EVENT_CONNECT_ERROR, args -> {
+            synchronized (pendingRequests) {
+                pendingRequests.remove(requestKey);
+            }
+            response.onError(new IllegalArgumentException("اتصال برقرار نشد"));
+        });
     }
 
     public static void disconnect() {
@@ -715,6 +836,87 @@ public class SocketManager {
             sendRequest(context, request);
         } catch (JSONException e) {
             if (listener != null) listener.onGamePlayersInfoError(e);
+        }
+    }
+
+    public static void uploadAvatar(Context context, String userId, Uri imageUri, UploadCallback callback) {
+        reconnectIfNeeded();
+        if (!socket.connected() || !isConnect) {
+            callback.onError("اتصال برقرار نشد");
+            return;
+        }
+
+        if (userId == null || userId.trim().isEmpty()) {
+            callback.onError("شناسه کاربر نامعتبر است");
+            return;
+        }
+
+        try {
+            // خواندن تصویر به‌صورت بایت
+            InputStream inputStream = context.getContentResolver().openInputStream(imageUri);
+            if (inputStream == null) {
+                callback.onError("خطا در خواندن تصویر");
+                return;
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                baos.write(buffer, 0, bytesRead);
+            }
+            inputStream.close();
+            byte[] imageBytes = baos.toByteArray();
+
+            // تنظیم اندازه تکه‌ها (مثلاً 16KB)
+            final int CHUNK_SIZE = 16 * 1024;
+            int totalChunks = (int) Math.ceil((double) imageBytes.length / CHUNK_SIZE);
+            String uploadId = UUID.randomUUID().toString();
+
+            // ارسال اطلاعات اولیه آپلود
+            JSONObject initData = new JSONObject();
+            initData.put("uploadId", uploadId);
+            initData.put("userId", userId);
+            initData.put("totalChunks", totalChunks);
+            socket.emit("upload_avatar_init", initData);
+
+            // ارسال تکه‌ها
+            for (int i = 0; i < totalChunks; i++) {
+                int start = i * CHUNK_SIZE;
+                int end = Math.min(start + CHUNK_SIZE, imageBytes.length);
+                byte[] chunk = new byte[end - start];
+                System.arraycopy(imageBytes, start, chunk, 0, chunk.length);
+
+                JSONObject chunkData = new JSONObject();
+                chunkData.put("uploadId", uploadId);
+                chunkData.put("chunkIndex", i);
+                chunkData.put("totalChunks", totalChunks);
+                chunkData.put("userId", userId); // اضافه کردن userId به هر تکه
+                socket.emit("upload_avatar_chunk", chunkData, chunk);
+            }
+
+            // گوش دادن به پاسخ سرور
+            socket.once("upload_avatar_complete_" + uploadId, args -> {
+                try {
+                    JSONObject response = (JSONObject) args[0];
+                    if (response.getBoolean("success")) {
+                        callback.onSuccess();
+                    } else {
+                        callback.onError(response.getString("message"));
+                    }
+                } catch (JSONException e) {
+                    callback.onError("خطا در پردازش پاسخ سرور");
+                }
+            });
+
+            socket.once("upload_avatar_error_" + uploadId, args -> {
+                String errorMessage = args[0] != null ? args[0].toString() : "خطای ناشناخته";
+                callback.onError(errorMessage);
+            });
+
+        } catch (Exception e) {
+            callback.onError("خطا در آپلود تصویر: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

@@ -41,9 +41,15 @@ dependencies {
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
-    implementation ('io.socket:socket.io-client:2.1.1') {
+    implementation('io.socket:socket.io-client:2.1.1') {
         // excluding org.json which is provided by Android
         exclude group: 'org.json', module: 'json'
     }
+    implementation libs.glide
     implementation libs.gson
+    implementation libs.ucrop.v2210
+    implementation libs.ucrop.v229native
+
+
+
 }

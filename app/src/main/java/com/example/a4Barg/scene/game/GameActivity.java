@@ -1,15 +1,20 @@
 package com.example.a4Barg.scene.game;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.model.Card;
+import com.example.a4Barg.model.InGameMessage; // جدید
 import com.example.a4Barg.networking.SocketManager;
 import com.example.a4Barg.utils.CollectedCardsView;
 import com.example.a4Barg.utils.HandView;
@@ -32,8 +37,12 @@ public class GameActivity extends AppCompatActivity {
     private TextView userUsername, userExp, userCoins, userSurs;
     private TextView opponentUsername, opponentExp, opponentCoins, opponentSurs;
     private TextView turnIndicator;
-    private TextView tvResults; // جدید
+    private TextView tvResults;
+    private Button btnInGameMessage; // جدید
+    private TextView tvUserInGameMessage; // جدید
+    private TextView tvOpponentInGameMessage; // جدید
     private List<Card> selectedTableCards = new ArrayList<>();
+    private final Handler handler = new Handler(Looper.getMainLooper()); // جدید: برای تایمر
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,7 +68,10 @@ public class GameActivity extends AppCompatActivity {
         opponentCoins = findViewById(R.id.opponent_coins);
         opponentSurs = findViewById(R.id.opponent_surs);
         turnIndicator = findViewById(R.id.turn_indicator);
-        tvResults = findViewById(R.id.tvResults); // جدید
+        tvResults = findViewById(R.id.tvResults);
+        btnInGameMessage = findViewById(R.id.btnInGameMessage); // جدید
+        tvUserInGameMessage = findViewById(R.id.tvUserInGameMessage); // جدید
+        tvOpponentInGameMessage = findViewById(R.id.tvOpponentInGameMessage); // جدید
 
         userHandView.setShowCards(true);
         opponentHandView.setShowCards(false);
@@ -118,6 +130,9 @@ public class GameActivity extends AppCompatActivity {
             }
         });
 
+        // تنظیم دکمه برای باز کردن دیالوگ پیام‌ها
+        btnInGameMessage.setOnClickListener(v -> showMessageDialog());
+
         SocketManager.initialize(this, userId);
         viewModel.setupGameListeners(this);
 
@@ -155,12 +170,43 @@ public class GameActivity extends AppCompatActivity {
                 userHandView.setEnabled(false);
                 tableView.setSelectable(false);
                 turnIndicator.setText("بازی تموم شد");
-                tvResults.setVisibility(View.VISIBLE); // نمایش TextView در پایان بازی
+                tvResults.setVisibility(View.VISIBLE);
             }
         });
         viewModel.getGameResultText().observe(this, resultText -> {
-            tvResults.setText(resultText); // تنظیم متن نتایج
+            tvResults.setText(resultText);
         });
+
+        // مشاهده پیام‌های دریافتی (جدید)
+        viewModel.getInGameMessage().observe(this, message -> {
+            if (message != null) {
+                if (message.getUserId().equals(userId)) {
+                    showMessage(tvUserInGameMessage, message.getMessage());
+                } else {
+                    showMessage(tvOpponentInGameMessage, message.getMessage());
+                }
+            }
+        });
+    }
+
+    // دیالوگ پیام‌های آماده (جدید)
+    private void showMessageDialog() {
+        String[] messages = {"دمت گرم", "عجب بازیکنی", "بازی بلد نیستی", "من میبرم"};
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("انتخاب پیام");
+        builder.setItems(messages, (dialog, which) -> {
+            String selectedMessage = messages[which];
+            viewModel.sendInGameMessage(selectedMessage);
+        });
+        builder.setNegativeButton("لغو", null);
+        builder.show();
+    }
+
+    // نمایش پیام برای 5 ثانیه (جدید)
+    private void showMessage(TextView textView, String message) {
+        textView.setText(message);
+        textView.setVisibility(View.VISIBLE);
+        handler.postDelayed(() -> textView.setVisibility(View.GONE), 5000);
     }
 
     private int getCardValue(String rank) {
