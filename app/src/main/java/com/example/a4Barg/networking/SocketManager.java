@@ -537,7 +537,8 @@ public class SocketManager {
                         event.equals("create_room_response") || event.equals("join_room_response") ||
                         event.equals("leave_room_response") || event.equals("get_room_list_response") ||
                         event.equals("game_loading_response") || event.equals("play_card_response") ||
-                        event.equals("get_profile_response") || event.equals("update_profile_response")) {
+                        event.equals("get_profile_response") || event.equals("update_profile_response")
+                        || (event.equals("check_pending_avatar_response"))) {
                     if (success) {
                         if (event.equals("login_response") || event.equals("register_response")) {
                             ConsValue.isRegistered = true;

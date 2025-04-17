@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- سایر استایل‌های برنامه شما -->
+
+    <!-- استایل سفارشی برای AlertDialog -->
+    <style name="AlertDialogCustom" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <!-- رنگ پس‌زمینه دیالوگ -->
+        <item name="android:background">@color/white</item> <!-- یا هر رنگ دلخواه دیگر -->
+
+        <!-- رنگ متن عنوان -->
+        <item name="android:windowTitleStyle">@style/AlertDialogCustom.Title</item>
+
+        <!-- رنگ متن پیام -->
+        <item name="android:textColorPrimary">@color/black</item> <!-- یا هر رنگ دلخواه دیگر -->
+
+        <!-- استایل دکمه‌ها -->
+        <item name="buttonBarPositiveButtonStyle">@style/AlertDialogCustom.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/AlertDialogCustom.Button</item>
+        <item name="buttonBarNeutralButtonStyle">@style/AlertDialogCustom.Button</item>
+    </style>
+
+    <!-- استایل سفارشی برای عنوان دیالوگ -->
+    <style name="AlertDialogCustom.Title" parent="TextAppearance.AppCompat.Title">
+        <item name="android:textColor">@color/purple_500</item> <!-- رنگ عنوان -->
+        <!-- <item name="android:textAlignment">center</item> --> <!-- تراز وسط (اختیاری) -->
+        <!-- <item name="android:padding">16dp</item> --> <!-- پدینگ (اختیاری) -->
+    </style>
+
+    <!-- استایل سفارشی برای دکمه‌های دیالوگ -->
+    <style name="AlertDialogCustom.Button" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
+        <item name="android:textColor">@color/purple_700</item> <!-- رنگ متن دکمه‌ها -->
+        <!-- <item name="android:backgroundTint">@color/your_button_background_color</item> --> <!-- رنگ پس‌زمینه دکمه (اختیاری) -->
+        <!-- <item name="android:textStyle">bold</item> --> <!-- استایل متن (اختیاری) -->
+    </style>
+
+</resources>

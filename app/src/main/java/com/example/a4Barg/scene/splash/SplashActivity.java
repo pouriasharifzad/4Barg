@@ -71,7 +71,7 @@ public class SplashActivity extends BaseActivity {
 
         // ایجاد انیمیشن برای پر شدن تا 50 درصد
         loadingAnimator = ValueAnimator.ofInt(0, (int) (maxFillWidth * targetFraction));
-        loadingAnimator.setDuration(2100); // 3 ثانیه برای پر شدن تا 50 درصد
+        loadingAnimator.setDuration(1700); // 3 ثانیه برای پر شدن تا 50 درصد
         loadingAnimator.setInterpolator(new LinearInterpolator()); // برای حرکت یکنواخت و نرم
         loadingAnimator.addUpdateListener(animation -> {
             int animatedWidth = (int) animation.getAnimatedValue();
@@ -152,7 +152,7 @@ public class SplashActivity extends BaseActivity {
 
         // ایجاد انیمیشن برای پر شدن از 50 درصد به 100 درصد
         ValueAnimator finalAnimator = ValueAnimator.ofInt(loadingFill.getWidth(), maxFillWidth);
-        finalAnimator.setDuration(2100); // 3 ثانیه برای پر شدن از 50 درصد به 100 درصد
+        finalAnimator.setDuration(1700); // 3 ثانیه برای پر شدن از 50 درصد به 100 درصد
         finalAnimator.setInterpolator(new LinearInterpolator()); // برای حرکت یکنواخت و نرم
         finalAnimator.addUpdateListener(animation -> {
             int animatedWidth = (int) animation.getAnimatedValue();

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ابعاد کارت در دست بازیکن -->
+    <dimen name="card_width">100dp</dimen>
+    <dimen name="card_height">150dp</dimen>
+
+    <!-- ابعاد کارت روی میز -->
+    <dimen name="table_card_width">70dp</dimen>
+    <dimen name="table_card_height">105dp</dimen>
+
+</resources>
