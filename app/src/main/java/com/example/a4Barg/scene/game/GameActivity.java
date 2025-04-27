@@ -1,20 +1,25 @@
 package com.example.a4Barg.scene.game;
 
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.model.Card;
-import com.example.a4Barg.model.InGameMessage; // جدید
+import com.example.a4Barg.model.InGameMessage;
 import com.example.a4Barg.networking.SocketManager;
 import com.example.a4Barg.utils.CollectedCardsView;
 import com.example.a4Barg.utils.HandView;
@@ -38,11 +43,12 @@ public class GameActivity extends AppCompatActivity {
     private TextView opponentUsername, opponentExp, opponentCoins, opponentSurs;
     private TextView turnIndicator;
     private TextView tvResults;
-    private Button btnInGameMessage; // جدید
-    private TextView tvUserInGameMessage; // جدید
-    private TextView tvOpponentInGameMessage; // جدید
+    private Button btnInGameMessage;
+    private TextView tvUserInGameMessage;
+    private TextView tvOpponentInGameMessage;
     private List<Card> selectedTableCards = new ArrayList<>();
-    private final Handler handler = new Handler(Looper.getMainLooper()); // جدید: برای تایمر
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private ConstraintLayout rootLayout;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +60,7 @@ public class GameActivity extends AppCompatActivity {
         roomNumber = getIntent().getStringExtra("roomNumber");
         viewModel.setUserId(userId);
 
+        rootLayout = findViewById(R.id.layout);
         userHandView = findViewById(R.id.user_handView);
         opponentHandView = findViewById(R.id.opponent_handView);
         tableView = findViewById(R.id.table_view);
@@ -69,21 +76,29 @@ public class GameActivity extends AppCompatActivity {
         opponentSurs = findViewById(R.id.opponent_surs);
         turnIndicator = findViewById(R.id.turn_indicator);
         tvResults = findViewById(R.id.tvResults);
-        btnInGameMessage = findViewById(R.id.btnInGameMessage); // جدید
-        tvUserInGameMessage = findViewById(R.id.tvUserInGameMessage); // جدید
-        tvOpponentInGameMessage = findViewById(R.id.tvOpponentInGameMessage); // جدید
+        btnInGameMessage = findViewById(R.id.btnInGameMessage);
+        tvUserInGameMessage = findViewById(R.id.tvUserInGameMessage);
+        tvOpponentInGameMessage = findViewById(R.id.tvOpponentInGameMessage);
 
         userHandView.setShowCards(true);
         opponentHandView.setShowCards(false);
 
-        userHandView.setOnCardPlayedListener(card -> {
-            List<Card> tableCards = tableView.getCards();
-            List<List<Card>> combinations = findCombinations(tableCards, getCardValue(card.getRank()));
-            if (combinations.size() > 1) {
-                viewModel.playCard(card, new ArrayList<>());
-            } else {
-                List<Card> cardsToCollect = combinations.isEmpty() ? new ArrayList<>() : combinations.get(0);
-                viewModel.playCard(card, cardsToCollect);
+        userHandView.setOnCardPlayedListener(new HandView.OnCardPlayedListener() {
+            @Override
+            public void onCardPlayed(Card card, float dropX, float dropY, float rotation) {
+                List<Card> tableCards = tableView.getCards();
+                List<List<Card>> combinations = findCombinations(tableCards, getCardValue(card.getRank()));
+                if (combinations.size() > 1) {
+                    viewModel.playCard(card, new ArrayList<>());
+                } else {
+                    List<Card> cardsToCollect = combinations.isEmpty() ? new ArrayList<>() : combinations.get(0);
+                    viewModel.playCard(card, cardsToCollect);
+                }
+                viewModel.setLastDropPosition(dropX, dropY, rotation);
+            }
+
+            @Override
+            public void onCardPlayed(Card card) {
             }
         });
 
@@ -130,7 +145,6 @@ public class GameActivity extends AppCompatActivity {
             }
         });
 
-        // تنظیم دکمه برای باز کردن دیالوگ پیام‌ها
         btnInGameMessage.setOnClickListener(v -> showMessageDialog());
 
         SocketManager.initialize(this, userId);
@@ -177,7 +191,6 @@ public class GameActivity extends AppCompatActivity {
             tvResults.setText(resultText);
         });
 
-        // مشاهده پیام‌های دریافتی (جدید)
         viewModel.getInGameMessage().observe(this, message -> {
             if (message != null) {
                 if (message.getUserId().equals(userId)) {
@@ -189,7 +202,6 @@ public class GameActivity extends AppCompatActivity {
         });
     }
 
-    // دیالوگ پیام‌های آماده (جدید)
     private void showMessageDialog() {
         String[] messages = {"دمت گرم", "عجب بازیکنی", "بازی بلد نیستی", "من میبرم"};
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -202,7 +214,6 @@ public class GameActivity extends AppCompatActivity {
         builder.show();
     }
 
-    // نمایش پیام برای 5 ثانیه (جدید)
     private void showMessage(TextView textView, String message) {
         textView.setText(message);
         textView.setVisibility(View.VISIBLE);
@@ -289,5 +300,78 @@ public class GameActivity extends AppCompatActivity {
             turnIndicator.setText("نوبت حریف");
             userHandView.setEnabled(false);
         }
+    }
+
+    public TableView getTableView() {
+        return tableView;
+    }
+
+    public HandView getUserHandView() {
+        return userHandView;
+    }
+
+    public HandView getOpponentHandView() {
+        return opponentHandView;
+    }
+
+    public void animateCard(Card card, boolean isUser, float startX, float startY, float startRotation, Runnable onAnimationEnd) {
+        ImageView animatedCard = new ImageView(this);
+        int resId = getResources().getIdentifier(card.getImageResourceName(), "drawable", getPackageName());
+        animatedCard.setImageResource(resId != 0 ? resId : R.drawable.card_back);
+
+        DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+        int cardWidth = (int) (120 * displayMetrics.density);
+        int cardHeightPx = (int) (138 * displayMetrics.density);
+        ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
+        animatedCard.setLayoutParams(params);
+
+        animatedCard.setElevation(25f);
+
+        animatedCard.setX(startX);
+        animatedCard.setY(startY);
+        animatedCard.setRotation(startRotation);
+
+        rootLayout.addView(animatedCard);
+
+        tableView.post(() -> {
+            float[] lastCardPosition = tableView.getLastCardPosition();
+            float endX = tableView.getX() + lastCardPosition[0];
+            float endY = tableView.getY() + lastCardPosition[1];
+
+            float adjustedStartY = startY;
+            if (!isUser) {
+                adjustedStartY -= cardHeightPx;
+            }
+
+            ObjectAnimator moveX = ObjectAnimator.ofFloat(animatedCard, "x", startX, endX);
+            ObjectAnimator moveY = ObjectAnimator.ofFloat(animatedCard, "y", adjustedStartY, endY);
+            ObjectAnimator rotate = ObjectAnimator.ofFloat(animatedCard, "rotation", startRotation, 0f);
+
+            AnimatorSet animatorSet = new AnimatorSet();
+            animatorSet.playTogether(moveX, moveY, rotate);
+            animatorSet.setDuration(1000);
+            animatorSet.start();
+
+            animatorSet.addListener(new android.animation.AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(android.animation.Animator animation) {
+                    // اضافه کردن انیمیشن محو شدن (fade out) برای کارت انیمیشن‌شده
+                    ObjectAnimator fadeOut = ObjectAnimator.ofFloat(animatedCard, "alpha", 1f, 0f);
+                    fadeOut.setDuration(200); // مدت زمان محو شدن 200 میلی‌ثانیه
+                    fadeOut.start();
+
+                    // اجرای callback برای به‌روزرسانی TableView
+                    if (onAnimationEnd != null) {
+                        onAnimationEnd.run();
+                    }
+
+                    // اطمینان از رندر شدن TableView قبل از حذف کارت انیمیشن‌شده
+                    tableView.post(() -> {
+                        // حذف کارت انیمیشن‌شده پس از اطمینان از رندر شدن TableView
+                        rootLayout.removeView(animatedCard);
+                    });
+                }
+            });
+        });
     }
 }

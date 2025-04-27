@@ -199,15 +199,21 @@ public class HandView extends FrameLayout {
                         float currentY = draggedCard.getY();
                         if (cardStartY - currentY > PLAY_THRESHOLD) {
                             if (cardPlayedListener != null) {
-                                cardPlayedListener.onCardPlayed(card);
+                                // محاسبه مختصات جهانی (relative to the root view)
+                                int[] location = new int[2];
+                                HandView.this.getLocationOnScreen(location);
+                                float globalDropX = draggedCard.getX() + location[0];
+                                float globalDropY = draggedCard.getY() + location[1];
+                                // گرفتن زاویه کارت
+                                float rotation = draggedCard.getRotation();
+                                cardPlayedListener.onCardPlayed(card, globalDropX, globalDropY, rotation);
                             }
-                            removeCardFromHand(card);
                         } else {
                             draggedCard.setX(v.getLeft());
                             draggedCard.setY(cardStartY);
+                            draggedCard = null;
+                            requestLayout();
                         }
-                        draggedCard = null;
-                        requestLayout();
                         return true;
                 }
                 return false;
@@ -215,16 +221,18 @@ public class HandView extends FrameLayout {
         });
     }
 
-    private void removeCardFromHand(Card card) {
+    public void removeCardFromHand(Card card) {
         int index = cardModels.indexOf(card);
         if (index != -1) {
             removeView(cards.get(index));
             cards.remove(index);
             cardModels.remove(index);
+            requestLayout();
         }
     }
 
     public interface OnCardPlayedListener {
-        void onCardPlayed(Card card);
+        void onCardPlayed(Card card, float dropX, float dropY, float rotation);
+        void onCardPlayed(Card card); // برای سازگاری با کد قبلی
     }
 }

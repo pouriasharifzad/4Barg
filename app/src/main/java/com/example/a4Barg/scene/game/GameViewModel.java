@@ -11,9 +11,10 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.a4Barg.model.Card;
-import com.example.a4Barg.model.InGameMessage; // جدید
+import com.example.a4Barg.model.InGameMessage;
 import com.example.a4Barg.model.SocketRequest;
 import com.example.a4Barg.networking.SocketManager;
+import com.example.a4Barg.utils.HandView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -45,12 +46,22 @@ public class GameViewModel extends AndroidViewModel {
     private final MutableLiveData<Integer> opponentScore = new MutableLiveData<>(0);
     private final MutableLiveData<String> winner = new MutableLiveData<>();
     private final MutableLiveData<String> gameResultText = new MutableLiveData<>("");
-    private final MutableLiveData<InGameMessage> inGameMessage = new MutableLiveData<>(); // جدید
+    private final MutableLiveData<InGameMessage> inGameMessage = new MutableLiveData<>();
     private Card pendingCard;
     private boolean playersInfoRequested = false;
+    private float lastDropX = 0f;
+    private float lastDropY = 0f;
+    private float lastDropRotation = 0f; // متغیر جدید برای ذخیره زاویه
+    private GameActivity activity;
+    private boolean isAnimating = false; // پرچم برای بررسی وضعیت انیمیشن
+    private List<Card> pendingTableCardsUpdate = null; // برای ذخیره آپدیت‌های به تعویق افتاده
 
     public GameViewModel(Application application) {
         super(application);
+    }
+
+    public void setActivity(GameActivity activity) {
+        this.activity = activity;
     }
 
     public void setUserId(String userId) {
@@ -105,6 +116,7 @@ public class GameViewModel extends AndroidViewModel {
     }
 
     public void setupGameListeners(GameActivity activity) {
+        this.activity = activity;
         SocketManager.addPlayerCardsListener(new SocketManager.PlayerCardsListener() {
             @Override
             public void onPlayerCards(JSONObject data) {
@@ -126,7 +138,11 @@ public class GameViewModel extends AndroidViewModel {
                             JSONObject cardObj = tableCardsArray.getJSONObject(i);
                             cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
                         }
-                        tableCards.setValue(cards);
+                        if (isAnimating) {
+                            pendingTableCardsUpdate = cards; // ذخیره آپدیت برای بعد از انیمیشن
+                        } else {
+                            tableCards.setValue(cards);
+                        }
                     }
                 } catch (JSONException e) {
                 }
@@ -280,7 +296,11 @@ public class GameViewModel extends AndroidViewModel {
                             JSONObject cardObj = tableCardsArray.getJSONObject(i);
                             cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
                         }
-                        tableCards.setValue(cards);
+                        if (isAnimating) {
+                            pendingTableCardsUpdate = cards; // ذخیره آپدیت برای بعد از انیمیشن
+                        } else {
+                            tableCards.setValue(cards);
+                        }
                     }
                     if (data.has("currentTurn")) {
                         currentTurn.setValue(data.getString("currentTurn"));
@@ -429,7 +449,6 @@ public class GameViewModel extends AndroidViewModel {
             }
         });
 
-        // گوش دادن به پیام‌های دریافتی (جدید)
         SocketManager.addCustomListener("receive_in_game_message", new SocketManager.CustomListener() {
             @Override
             public void onEvent(JSONObject data) {
@@ -439,6 +458,65 @@ public class GameViewModel extends AndroidViewModel {
                     inGameMessage.setValue(new InGameMessage(senderUserId, message));
                 } catch (JSONException e) {
                     Log.e("GameViewModel", "Error parsing in-game message: " + e.getMessage());
+                }
+            }
+        });
+
+        SocketManager.addCustomListener("played_card", new SocketManager.CustomListener() {
+            @Override
+            public void onEvent(JSONObject data) {
+                try {
+                    String playerId = data.getString("userId");
+                    JSONObject cardObj = data.getJSONObject("card");
+                    String suit = cardObj.getString("suit");
+                    String value = cardObj.getString("value");
+                    Card playedCard = new Card(suit, value);
+                    boolean isUser = playerId.equals(userId);
+                    boolean isCollected = data.optBoolean("isCollected", false);
+
+                    String message;
+                    if (isCollected) {
+                        message = String.format("کارت %s of %s از (%s) بازی شد\nکارت جمع می‌شود",
+                                value, suit, isUser ? "شما" : "حریف");
+                        activity.runOnUiThread(() -> {
+                            Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+                            if (isUser) {
+                                activity.getUserHandView().removeCardFromHand(playedCard);
+                            }
+                        });
+                    } else {
+                        isAnimating = true; // شروع انیمیشن
+                        float[] lastCardPosition = activity.getTableView().getLastCardPosition();
+                        float endX = lastCardPosition[0];
+                        float endY = lastCardPosition[1];
+                        message = String.format("کارت %s of %s از (%s) بازی شد\nموقعیت مقصد: (%.2f, %.2f)",
+                                value, suit, isUser ? "شما" : "حریف", endX, endY);
+                        activity.runOnUiThread(() -> {
+                            Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+                            float startX, startY, startRotation;
+                            if (isUser) {
+                                startX = lastDropX;
+                                startY = lastDropY;
+                                startRotation = lastDropRotation; // استفاده از زاویه ذخیره‌شده
+                                activity.getUserHandView().removeCardFromHand(playedCard);
+                            } else {
+                                startX = activity.getOpponentHandView().getX() + (activity.getOpponentHandView().getWidth() / 2f);
+                                startY = activity.getOpponentHandView().getY() + (activity.getOpponentHandView().getHeight() / 2f);
+                                startRotation = 0f; // برای حریف زاویه صفر است
+                            }
+                            activity.animateCard(playedCard, isUser, startX, startY, startRotation, () -> {
+                                isAnimating = false; // پایان انیمیشن
+                                if (pendingTableCardsUpdate != null) {
+                                    tableCards.setValue(pendingTableCardsUpdate);
+                                    pendingTableCardsUpdate = null;
+                                }
+                            });
+                        });
+                    }
+
+                    Log.d("GameViewModel", "Played card position: " + message);
+                } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing played_card event: " + e.getMessage());
                 }
             }
         });
@@ -476,7 +554,6 @@ public class GameViewModel extends AndroidViewModel {
         }
     }
 
-    // ارسال پیام به سرور (جدید)
     public void sendInGameMessage(String message) {
         JSONObject data = new JSONObject();
         try {
@@ -488,7 +565,7 @@ public class GameViewModel extends AndroidViewModel {
                 @Override
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
                     if (!isError && object.getBoolean("success")) {
-                        inGameMessage.setValue(new InGameMessage(userId, message)); // نمایش پیام برای خود کاربر
+                        inGameMessage.setValue(new InGameMessage(userId, message));
                     }
                 }
 
@@ -501,6 +578,12 @@ public class GameViewModel extends AndroidViewModel {
         } catch (JSONException e) {
             Log.e("GameViewModel", "Error creating message JSON: " + e.getMessage());
         }
+    }
+
+    public void setLastDropPosition(float x, float y, float rotation) {
+        this.lastDropX = x;
+        this.lastDropY = y;
+        this.lastDropRotation = rotation; // ذخیره زاویه
     }
 
     public LiveData<List<Card>> getUserCards() { return userCards; }
@@ -519,6 +602,14 @@ public class GameViewModel extends AndroidViewModel {
     public LiveData<Integer> getOpponentScore() { return opponentScore; }
     public LiveData<String> getWinner() { return winner; }
     public LiveData<String> getGameResultText() { return gameResultText; }
-    public LiveData<InGameMessage> getInGameMessage() { return inGameMessage; } // جدید
+    public LiveData<InGameMessage> getInGameMessage() { return inGameMessage; }
     public Card getPendingCard() { return pendingCard; }
+
+    public HandView getUserHandView() {
+        return activity.getUserHandView();
+    }
+
+    public HandView getOpponentHandView() {
+        return activity.getOpponentHandView();
+    }
 }

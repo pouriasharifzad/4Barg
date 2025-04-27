@@ -19,9 +19,10 @@ public class TableView extends FrameLayout {
     private List<ImageView> cardViews = new ArrayList<>();
     private List<Card> cards = new ArrayList<>();
     private final int padding = 10;
-    private boolean isSelectable = false; // جدید
-    private List<Card> selectedCards = new ArrayList<>(); // جدید
-    private OnCardSelectedListener onCardSelectedListener; // جدید
+    private boolean isSelectable = false;
+    private List<Card> selectedCards = new ArrayList<>();
+    private OnCardSelectedListener onCardSelectedListener;
+    private float[] lastCardPosition = new float[]{0f, 0f}; // متغیر برای ذخیره مختصات آخرین کارت
 
     public TableView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -63,7 +64,10 @@ public class TableView extends FrameLayout {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         int count = cardViews.size();
-        if (count == 0) return;
+        if (count == 0) {
+            lastCardPosition = new float[]{0f, 0f}; // اگر هیچ کارتی نباشه، مختصات صفر می‌مونه
+            return;
+        }
 
         int screenWidth = getWidth();
         int screenHeight = getHeight();
@@ -99,16 +103,22 @@ public class TableView extends FrameLayout {
             int left = startX + (column * (cardWidth + horizontalSpacing));
             int top = startY + (row * (cardHeightPx + verticalSpacing));
             card.layout(left, top, left + cardWidth, top + cardHeightPx);
-            card.setZ(selectedCards.contains(cards.get(i)) ? 1 : 0); // کارت‌های انتخاب‌شده بالاتر نمایش داده می‌شن
-            card.setAlpha(selectedCards.contains(cards.get(i)) ? 0.7f : 1.0f); // کارت‌های انتخاب‌شده کمی شفاف‌تر
+            card.setZ(selectedCards.contains(cards.get(i)) ? 1 : 0);
+            card.setAlpha(selectedCards.contains(cards.get(i)) ? 0.7f : 1.0f);
         }
+
+        // محاسبه موقعیت کارت بعدی (n+1)
+        int nextIndex = count; // اندیس کارت بعدی
+        int nextRow = nextIndex / cardsPerRow;
+        int nextColumn = nextIndex % cardsPerRow;
+        lastCardPosition[0] = startX + (nextColumn * (cardWidth + horizontalSpacing));
+        lastCardPosition[1] = startY + (nextRow * (cardHeightPx + verticalSpacing));
     }
 
     public List<Card> getCards() {
         return cards;
     }
 
-    // جدید: تنظیم حالت انتخاب‌پذیری
     public void setSelectable(boolean selectable) {
         this.isSelectable = selectable;
         for (ImageView cardView : cardViews) {
@@ -118,24 +128,24 @@ public class TableView extends FrameLayout {
         requestLayout();
     }
 
-    // جدید: تنظیم لیسنر برای انتخاب کارت
     public void setOnCardSelectedListener(OnCardSelectedListener listener) {
         this.onCardSelectedListener = listener;
     }
 
-    // جدید: آپدیت وضعیت انتخاب
     public void updateSelection(List<Card> selected) {
         this.selectedCards = new ArrayList<>(selected);
         requestLayout();
     }
 
-    // جدید: پاک کردن انتخاب‌ها
     public void clearSelection() {
         selectedCards.clear();
         requestLayout();
     }
 
-    // جدید: اینترفیس برای انتخاب کارت
+    public float[] getLastCardPosition() {
+        return lastCardPosition; // برگرداندن مختصات کارت بعدی
+    }
+
     public interface OnCardSelectedListener {
         void onCardSelected(Card card);
     }
