@@ -21,9 +21,8 @@ import com.example.a4Barg.R;
 import com.example.a4Barg.model.Card;
 import com.example.a4Barg.model.InGameMessage;
 import com.example.a4Barg.networking.SocketManager;
+import com.example.a4Barg.utils.CardContainerView;
 import com.example.a4Barg.utils.CollectedCardsView;
-import com.example.a4Barg.utils.HandView;
-import com.example.a4Barg.utils.TableView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,9 +30,9 @@ import java.util.List;
 public class GameActivity extends AppCompatActivity {
 
     private GameViewModel viewModel;
-    private HandView userHandView;
-    private HandView opponentHandView;
-    private TableView tableView;
+    private CardContainerView userHandView;
+    private CardContainerView opponentHandView;
+    private CardContainerView tableView;
     private CollectedCardsView userCollectedCardsView;
     private CollectedCardsView opponentCollectedCardsView;
     private String userId;
@@ -80,10 +79,14 @@ public class GameActivity extends AppCompatActivity {
         tvUserInGameMessage = findViewById(R.id.tvUserInGameMessage);
         tvOpponentInGameMessage = findViewById(R.id.tvOpponentInGameMessage);
 
+        userHandView.setType(CardContainerView.Type.HAND);
+        opponentHandView.setType(CardContainerView.Type.HAND);
+        tableView.setType(CardContainerView.Type.TABLE);
+
         userHandView.setShowCards(true);
         opponentHandView.setShowCards(false);
 
-        userHandView.setOnCardPlayedListener(new HandView.OnCardPlayedListener() {
+        userHandView.setOnCardPlayedListener(new CardContainerView.OnCardPlayedListener() {
             @Override
             public void onCardPlayed(Card card, float dropX, float dropY, float rotation) {
                 List<Card> tableCards = tableView.getCards();
@@ -95,10 +98,6 @@ public class GameActivity extends AppCompatActivity {
                     viewModel.playCard(card, cardsToCollect);
                 }
                 viewModel.setLastDropPosition(dropX, dropY, rotation);
-            }
-
-            @Override
-            public void onCardPlayed(Card card) {
             }
         });
 
@@ -302,15 +301,15 @@ public class GameActivity extends AppCompatActivity {
         }
     }
 
-    public TableView getTableView() {
+    public CardContainerView getTableView() {
         return tableView;
     }
 
-    public HandView getUserHandView() {
+    public CardContainerView getUserHandView() {
         return userHandView;
     }
 
-    public HandView getOpponentHandView() {
+    public CardContainerView getOpponentHandView() {
         return opponentHandView;
     }
 
@@ -355,19 +354,15 @@ public class GameActivity extends AppCompatActivity {
             animatorSet.addListener(new android.animation.AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(android.animation.Animator animation) {
-                    // اضافه کردن انیمیشن محو شدن (fade out) برای کارت انیمیشن‌شده
                     ObjectAnimator fadeOut = ObjectAnimator.ofFloat(animatedCard, "alpha", 1f, 0f);
-                    fadeOut.setDuration(200); // مدت زمان محو شدن 200 میلی‌ثانیه
+                    fadeOut.setDuration(200);
                     fadeOut.start();
 
-                    // اجرای callback برای به‌روزرسانی TableView
                     if (onAnimationEnd != null) {
                         onAnimationEnd.run();
                     }
 
-                    // اطمینان از رندر شدن TableView قبل از حذف کارت انیمیشن‌شده
                     tableView.post(() -> {
-                        // حذف کارت انیمیشن‌شده پس از اطمینان از رندر شدن TableView
                         rootLayout.removeView(animatedCard);
                     });
                 }

@@ -14,7 +14,7 @@ import com.example.a4Barg.model.Card;
 import com.example.a4Barg.model.InGameMessage;
 import com.example.a4Barg.model.SocketRequest;
 import com.example.a4Barg.networking.SocketManager;
-import com.example.a4Barg.utils.HandView;
+import com.example.a4Barg.utils.CardContainerView;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -51,10 +51,10 @@ public class GameViewModel extends AndroidViewModel {
     private boolean playersInfoRequested = false;
     private float lastDropX = 0f;
     private float lastDropY = 0f;
-    private float lastDropRotation = 0f; // متغیر جدید برای ذخیره زاویه
+    private float lastDropRotation = 0f;
     private GameActivity activity;
-    private boolean isAnimating = false; // پرچم برای بررسی وضعیت انیمیشن
-    private List<Card> pendingTableCardsUpdate = null; // برای ذخیره آپدیت‌های به تعویق افتاده
+    private boolean isAnimating = false;
+    private List<Card> pendingTableCardsUpdate = null;
 
     public GameViewModel(Application application) {
         super(application);
@@ -139,7 +139,7 @@ public class GameViewModel extends AndroidViewModel {
                             cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
                         }
                         if (isAnimating) {
-                            pendingTableCardsUpdate = cards; // ذخیره آپدیت برای بعد از انیمیشن
+                            pendingTableCardsUpdate = cards;
                         } else {
                             tableCards.setValue(cards);
                         }
@@ -297,7 +297,7 @@ public class GameViewModel extends AndroidViewModel {
                             cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
                         }
                         if (isAnimating) {
-                            pendingTableCardsUpdate = cards; // ذخیره آپدیت برای بعد از انیمیشن
+                            pendingTableCardsUpdate = cards;
                         } else {
                             tableCards.setValue(cards);
                         }
@@ -485,7 +485,7 @@ public class GameViewModel extends AndroidViewModel {
                             }
                         });
                     } else {
-                        isAnimating = true; // شروع انیمیشن
+                        isAnimating = true;
                         float[] lastCardPosition = activity.getTableView().getLastCardPosition();
                         float endX = lastCardPosition[0];
                         float endY = lastCardPosition[1];
@@ -497,15 +497,15 @@ public class GameViewModel extends AndroidViewModel {
                             if (isUser) {
                                 startX = lastDropX;
                                 startY = lastDropY;
-                                startRotation = lastDropRotation; // استفاده از زاویه ذخیره‌شده
+                                startRotation = lastDropRotation;
                                 activity.getUserHandView().removeCardFromHand(playedCard);
                             } else {
                                 startX = activity.getOpponentHandView().getX() + (activity.getOpponentHandView().getWidth() / 2f);
                                 startY = activity.getOpponentHandView().getY() + (activity.getOpponentHandView().getHeight() / 2f);
-                                startRotation = 0f; // برای حریف زاویه صفر است
+                                startRotation = 0f;
                             }
                             activity.animateCard(playedCard, isUser, startX, startY, startRotation, () -> {
-                                isAnimating = false; // پایان انیمیشن
+                                isAnimating = false;
                                 if (pendingTableCardsUpdate != null) {
                                     tableCards.setValue(pendingTableCardsUpdate);
                                     pendingTableCardsUpdate = null;
@@ -583,7 +583,7 @@ public class GameViewModel extends AndroidViewModel {
     public void setLastDropPosition(float x, float y, float rotation) {
         this.lastDropX = x;
         this.lastDropY = y;
-        this.lastDropRotation = rotation; // ذخیره زاویه
+        this.lastDropRotation = rotation;
     }
 
     public LiveData<List<Card>> getUserCards() { return userCards; }
@@ -605,11 +605,11 @@ public class GameViewModel extends AndroidViewModel {
     public LiveData<InGameMessage> getInGameMessage() { return inGameMessage; }
     public Card getPendingCard() { return pendingCard; }
 
-    public HandView getUserHandView() {
+    public CardContainerView getUserHandView() {
         return activity.getUserHandView();
     }
 
-    public HandView getOpponentHandView() {
+    public CardContainerView getOpponentHandView() {
         return activity.getOpponentHandView();
     }
 }

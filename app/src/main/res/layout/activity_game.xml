@@ -19,7 +19,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.498" />
 
-    <com.example.a4Barg.utils.TableView
+    <com.example.a4Barg.utils.CardContainerView
         android:id="@+id/table_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -123,7 +123,7 @@
             android:textColor="#FFFFFF" />
     </LinearLayout>
 
-    <com.example.a4Barg.utils.HandView
+    <com.example.a4Barg.utils.CardContainerView
         android:id="@+id/user_handView"
         android:layout_width="413dp"
         android:layout_height="521dp"
@@ -136,7 +136,7 @@
         app:layout_constraintTop_toBottomOf="@+id/imageView"
         app:layout_constraintVertical_bias="0.811" />
 
-    <com.example.a4Barg.utils.HandView
+    <com.example.a4Barg.utils.CardContainerView
         android:id="@+id/opponent_handView"
         android:layout_width="413dp"
         android:layout_height="203dp"
@@ -245,7 +245,5 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/table_view" />
-
-
 
 </androidx.constraintlayout.widget.ConstraintLayout>
