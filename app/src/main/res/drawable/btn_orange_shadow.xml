@@ -1,0 +1,17 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- سایه سفید -->
+    <item android:right="4dp" android:bottom="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+
+    <!-- خود دکمه -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#E4A454" /> <!-- رنگ طلایی نارنجی -->
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+</layer-list>

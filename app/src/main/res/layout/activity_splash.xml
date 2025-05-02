@@ -4,9 +4,22 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/splash_background">
+    android:background="@drawable/loginbg">
 
     <!-- کادر پرشونده -->
+
+    <ImageView
+        android:id="@+id/image_view_logo"
+        android:layout_width="match_parent"
+        android:layout_height="290dp"
+        android:background="@drawable/loginheader"
+        android:transitionName="logoTransition"
+        app:layout_constraintBottom_toTopOf="@+id/loading_text"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.666"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.699" />
 
     <LinearLayout
         android:id="@+id/loading_container"

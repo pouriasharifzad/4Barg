@@ -4,9 +4,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
+import android.view.animation.AlphaAnimation;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -19,6 +19,7 @@ import com.example.a4Barg.networking.SocketManager;
 import com.example.a4Barg.scene.lobby.LobbyActivity;
 import com.example.a4Barg.utils.ConsValue;
 import com.example.a4Barg.utils.RandomInteger;
+import com.google.android.material.textfield.TextInputLayout;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -27,8 +28,8 @@ public class LoginActivity extends BaseActivity {
     private LoginViewModel viewModel;
     private EditText emailField, passwordField, usernameField;
     private Button loginButton;
-    private TextView toggleRegister;
-    private LinearLayout registerSection;
+    private TextView toggleRegister, titleText;
+    private TextInputLayout usernameInputLayout; // تغییر از LinearLayout به TextInputLayout
     private boolean isRegisterMode = false;
     private String userId;
 
@@ -42,7 +43,8 @@ public class LoginActivity extends BaseActivity {
         usernameField = findViewById(R.id.username);
         loginButton = findViewById(R.id.loginButton);
         toggleRegister = findViewById(R.id.toggleRegister);
-        registerSection = findViewById(R.id.registerSection);
+        usernameInputLayout = findViewById(R.id.usernameInputLayout); // استفاده از ID جدید
+        titleText = findViewById(R.id.titleText); // دسترسی به عنوان
 
         viewModel = new ViewModelProvider(this).get(LoginViewModel.class);
         viewModel.getStatus().observe(this, status -> {
@@ -139,13 +141,55 @@ public class LoginActivity extends BaseActivity {
         toggleRegister.setOnClickListener(v -> {
             isRegisterMode = !isRegisterMode;
             if (isRegisterMode) {
-                registerSection.setVisibility(View.VISIBLE);
+                usernameInputLayout.setVisibility(View.VISIBLE);
                 loginButton.setText("ثبت‌نام");
                 toggleRegister.setText("حساب دارید؟ وارد شوید");
+                // انیمیشن برای تغییر متن عنوان
+                AlphaAnimation fadeOut = new AlphaAnimation(1.0f, 0.0f);
+                fadeOut.setDuration(300);
+                fadeOut.setFillAfter(true);
+                titleText.startAnimation(fadeOut);
+                fadeOut.setAnimationListener(new AlphaAnimation.AnimationListener() {
+                    @Override
+                    public void onAnimationStart(android.view.animation.Animation animation) {}
+
+                    @Override
+                    public void onAnimationEnd(android.view.animation.Animation animation) {
+                        titleText.setText("ثبت‌نام");
+                        AlphaAnimation fadeIn = new AlphaAnimation(0.0f, 1.0f);
+                        fadeIn.setDuration(300);
+                        fadeIn.setFillAfter(true);
+                        titleText.startAnimation(fadeIn);
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(android.view.animation.Animation animation) {}
+                });
             } else {
-                registerSection.setVisibility(View.GONE);
+                usernameInputLayout.setVisibility(View.GONE);
                 loginButton.setText("ورود");
                 toggleRegister.setText("حساب ندارید؟ ثبت‌نام کنید");
+                // انیمیشن برای تغییر متن عنوان
+                AlphaAnimation fadeOut = new AlphaAnimation(1.0f, 0.0f);
+                fadeOut.setDuration(300);
+                fadeOut.setFillAfter(true);
+                titleText.startAnimation(fadeOut);
+                fadeOut.setAnimationListener(new AlphaAnimation.AnimationListener() {
+                    @Override
+                    public void onAnimationStart(android.view.animation.Animation animation) {}
+
+                    @Override
+                    public void onAnimationEnd(android.view.animation.Animation animation) {
+                        titleText.setText("ورود به بازی");
+                        AlphaAnimation fadeIn = new AlphaAnimation(0.0f, 1.0f);
+                        fadeIn.setDuration(300);
+                        fadeIn.setFillAfter(true);
+                        titleText.startAnimation(fadeIn);
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(android.view.animation.Animation animation) {}
+                });
             }
         });
     }

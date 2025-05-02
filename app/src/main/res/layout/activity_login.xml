@@ -1,92 +1,179 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="16dp"
-    android:background="@drawable/paper_background">
+    android:background="@drawable/loginbg">
 
-    <!-- لوگو یا عنوان (اختیاری، با تم قبلی) -->
+    <ImageView
+        android:id="@+id/image_view_logo"
+        android:layout_width="match_parent"
+        android:layout_height="290dp"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/loginheader"
+        android:scaleType="fitCenter"
+        android:transitionName="logoTransition"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintWidth_percent="0.8" />
+
     <TextView
-        android:layout_width="match_parent"
+        android:id="@+id/titleText"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:fontFamily="@font/vazirmatn"
+        android:gravity="center"
         android:text="ورود به بازی"
-        android:textSize="28sp"
-        android:textColor="#FFFFFF"
-        android:gravity="center"
-        android:layout_marginBottom="32dp"/>
+        android:textColor="#E4A454"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/image_view_logo" />
 
-    <!-- فیلدهای مشترک لاگین -->
-    <EditText
-        android:id="@+id/email"
-        android:layout_width="match_parent"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/emailInputLayout"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:hint="ایمیل"
-        android:gravity="center"
-        android:inputType="textEmailAddress"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#80FFFFFF"
-        android:backgroundTint="#65D165"
-        android:padding="12dp"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginHorizontal="70dp"
+        android:layout_marginTop="16dp"
+        app:boxStrokeColor="@color/text_input_stroke_color"
+        app:hintAnimationEnabled="true"
+        android:textColorHint="@color/gold"
+        app:boxStrokeWidth="2dp"
+        app:boxCornerRadiusTopStart="15dp"
+        app:boxCornerRadiusTopEnd="15dp"
+        app:boxCornerRadiusBottomStart="15dp"
+        app:boxCornerRadiusBottomEnd="15dp"
+        app:hintTextColor="@color/gold"
+        app:hintTextAppearance="@style/MyHintTextAppearance"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/titleText">
 
-    <EditText
-        android:id="@+id/password"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="رمز عبور"
-        android:gravity="center"
-        android:inputType="textPassword"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#80FFFFFF"
-        android:backgroundTint="#00FF00"
-        android:padding="12dp"
-        android:layout_marginBottom="16dp"/>
-
-    <!-- بخش ثبت‌نام (پیش‌فرض مخفی) -->
-    <LinearLayout
-        android:id="@+id/registerSection"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <EditText
-            android:id="@+id/username"
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/email"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="نام کاربری"
-            android:gravity="center"
-            android:inputType="text"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#80FFFFFF"
-            android:backgroundTint="#00FF00"
+            android:fontFamily="@font/vazirmatn"
+            android:hint="ایمیل"
+            android:inputType="textEmailAddress"
             android:padding="12dp"
-            android:layout_marginBottom="16dp"/>
+            android:text=""
+            android:textColor="@color/gold"
+            android:textSize="16sp" />
+    </com.google.android.material.textfield.TextInputLayout>
 
-    </LinearLayout>
-
-    <!-- دکمه لاگین -->
-    <Button
-        android:id="@+id/loginButton"
-        android:layout_width="match_parent"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/passwordInputLayout"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="ورود"
-        android:textColor="#FFFFFF"
-        android:backgroundTint="#3B6F3B"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginHorizontal="70dp"
+        android:layout_marginTop="16dp"
+        app:boxStrokeColor="@color/text_input_stroke_color"
+        app:hintAnimationEnabled="true"
+        android:textColorHint="@color/gold"
+        app:boxStrokeWidth="2dp"
+        app:hintTextColor="@color/gold"
+        app:boxCornerRadiusTopStart="15dp"
+        app:boxCornerRadiusTopEnd="15dp"
+        app:boxCornerRadiusBottomStart="15dp"
+        app:boxCornerRadiusBottomEnd="15dp"
+        app:hintTextAppearance="@style/MyHintTextAppearance"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/emailInputLayout">
 
-    <!-- دکمه تغییر به ثبت‌نام -->
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/vazirmatn"
+            android:hint="رمز عبور"
+            android:inputType="textEmailAddress"
+            android:padding="12dp"
+            android:text=""
+            android:textColor="@color/gold"
+            android:textSize="16sp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/usernameInputLayout"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="70dp"
+            android:layout_marginTop="16dp"
+            app:boxStrokeColor="@color/text_input_stroke_color"
+            app:hintAnimationEnabled="true"
+            android:textColorHint="@color/gold"
+            app:hintTextColor="@color/gold"
+            app:boxStrokeWidth="2dp"
+            android:visibility="gone"
+            android:animateLayoutChanges="true"
+            app:boxCornerRadiusTopStart="15dp"
+            app:boxCornerRadiusTopEnd="15dp"
+            app:boxCornerRadiusBottomStart="15dp"
+            app:boxCornerRadiusBottomEnd="15dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/passwordInputLayout"
+            app:hintTextAppearance="@style/MyHintTextAppearance">
+
+            <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/username"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/vazirmatn"
+                android:hint="نام کاربری"
+                android:inputType="textEmailAddress"
+                android:padding="12dp"
+                android:text=""
+                android:textColor="@color/gold"
+                android:textSize="16sp"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/loginButton"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="0dp"
+        android:layout_marginHorizontal="80dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="16dp"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/vazirmatn"
+        android:paddingVertical="12dp"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        app:backgroundTint="#E4A454"
+        app:cornerRadius="15dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:text="ورود"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/usernameInputLayout"
+        app:strokeColor="@color/white"
+        app:strokeWidth="2dp" />
+
     <TextView
         android:id="@+id/toggleRegister"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="حساب ندارید؟ ثبت‌نام کنید"
-        android:textSize="16sp"
-        android:textColor="#00FF00"
+        android:fontFamily="@font/vazirmatn"
         android:gravity="center"
-        android:layout_gravity="center"
-        android:padding="8dp"/>
-
-</LinearLayout>
+        android:padding="8dp"
+        android:text="حساب ندارید؟ ثبت‌نام کنید"
+        android:textColor="#D4AF37"
+        android:textSize="16sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/loginButton"
+        app:layout_constraintVertical_bias="0.2" />
+</androidx.constraintlayout.widget.ConstraintLayout>

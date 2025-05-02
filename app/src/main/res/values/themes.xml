@@ -3,7 +3,8 @@
     <style name="Base.Theme.a4Barg" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="android:windowContentTransitions">true</item>
     </style>
-
+    <style name="MyHintTextAppearance" parent="TextAppearance.AppCompat.Caption"> <item name="android:textSize">18sp</item> </style>
     <style name="Theme.a4Barg" parent="Base.Theme.a4Barg" />
 </resources>
