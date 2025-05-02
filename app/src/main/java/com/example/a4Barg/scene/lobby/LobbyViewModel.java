@@ -25,20 +25,6 @@ public class LobbyViewModel extends AndroidViewModel {
 
     public LobbyViewModel(Application application) {
         super(application);
-        // گوش دادن به آپدیت‌های لیست روم‌ها
-        SocketManager.listenForRoomListUpdates(new SocketManager.RoomListUpdateListener() {
-            @Override
-            public void onRoomListUpdate(JSONObject roomListData) {
-                Log.d("TEST", "Room list updated: " + roomListData.toString());
-                message.postValue("لیست روم‌ها آپدیت شد: " + roomListData.toString());
-            }
-
-            @Override
-            public void onRoomListError(Throwable t) {
-                Log.d("TEST", "Room list update error: " + t.getMessage());
-                message.postValue("خطا در آپدیت لیست روم‌ها: " + t.getMessage());
-            }
-        });
     }
 
     public void setUserId(String userId) {

@@ -135,7 +135,14 @@ public class RoomActivity extends BaseActivity {
                 } else if (msg.equals("در حال بارگذاری بازی...")) {
                     startCountdown();
                 } else if (msg.equals("با موفقیت از روم خارج شدید")) {
-                    Intent intent = new Intent(RoomActivity.this, RoomListActivity.class);
+                    Intent intent;
+                    if (isHost) {
+                        // میزبان به LobbyActivity منتقل می‌شود
+                        intent = new Intent(RoomActivity.this, LobbyActivity.class);
+                    } else {
+                        // مهمان به RoomListActivity منتقل می‌شود
+                        intent = new Intent(RoomActivity.this, RoomListActivity.class);
+                    }
                     intent.putExtra("userId", userId);
                     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                     startActivity(intent);

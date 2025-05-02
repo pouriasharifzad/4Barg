@@ -28,7 +28,6 @@ public class RoomListViewModel extends AndroidViewModel {
 
     public RoomListViewModel(Application application) {
         super(application);
-        setupRoomListListener();
     }
 
     public void setUserId(String userId) {
@@ -82,42 +81,6 @@ public class RoomListViewModel extends AndroidViewModel {
         } catch (JSONException e) {
             errorMessage.postValue("خطا در پردازش داده‌ها");
         }
-    }
-
-    private void loadRoomList() {
-        // این متد فقط برای listener استفاده می‌شه و تغییر نمی‌کنه
-        SocketManager.listenForRoomListUpdates(new SocketManager.RoomListUpdateListener() {
-            @Override
-            public void onRoomListUpdate(JSONObject roomListData) {
-                try {
-                    JSONArray roomsArray = roomListData.getJSONArray("rooms");
-                    List<Room> rooms = new ArrayList<>();
-                    for (int i = 0; i < roomsArray.length(); i++) {
-                        JSONObject roomObj = roomsArray.getJSONObject(i);
-                        Room room = new Room(
-                                roomObj.getString("roomNumber"),
-                                roomObj.getInt("minExperience"),
-                                roomObj.getInt("minCoins"),
-                                roomObj.getInt("maxPlayers"),
-                                roomObj.getInt("currentPlayers")
-                        );
-                        rooms.add(room);
-                    }
-                    roomList.postValue(rooms);
-                } catch (JSONException e) {
-                    errorMessage.postValue("خطا در پردازش لیست روم‌ها");
-                }
-            }
-
-            @Override
-            public void onRoomListError(Throwable t) {
-                errorMessage.postValue(t.getMessage());
-            }
-        });
-    }
-
-    private void setupRoomListListener() {
-        loadRoomList();
     }
 
     public void joinRoom(String roomNumber) {

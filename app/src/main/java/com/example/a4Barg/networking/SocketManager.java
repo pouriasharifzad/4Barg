@@ -700,8 +700,8 @@ public class SocketManager {
         }
     }
 
-    public static void listenForRoomListUpdates(RoomListUpdateListener listener) {
-        socket.on("room_list_update", args -> {
+    public static Emitter.Listener listenForRoomListUpdates(RoomListUpdateListener listener) {
+        Emitter.Listener emitterListener = args -> {
             try {
                 JSONObject roomListData = (JSONObject) args[0];
                 Log.d("TEST", "Room list updated: " + roomListData.toString());
@@ -709,7 +709,9 @@ public class SocketManager {
             } catch (Exception e) {
                 listener.onRoomListError(e);
             }
-        });
+        };
+        socket.on("room_list_update", emitterListener);
+        return emitterListener;
     }
 
     public static void listenForRoomPlayersUpdates(RoomPlayersUpdateListener listener) {
