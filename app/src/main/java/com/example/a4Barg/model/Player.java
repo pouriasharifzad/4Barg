@@ -1,11 +1,14 @@
 package com.example.a4Barg.model;
 
-public class Player {
+import java.io.Serializable;
+
+public class Player implements Serializable {
     private String userId;
     private String username;
     private int cardCount;
     private int experience;
     private int coins;
+    private String avatar;
 
     public Player(String userId, String username, int cardCount, int experience, int coins) {
         this.userId = userId;
@@ -20,7 +23,13 @@ public class Player {
         this.username = username;
     }
 
-    // Getters and Setters
+    public Player(String userId, String username, int experience, String avatar) {
+        this.userId = userId;
+        this.username = username;
+        this.experience = experience;
+        this.avatar = avatar;
+    }
+
     public String getUserId() {
         return userId;
     }
@@ -59,5 +68,13 @@ public class Player {
 
     public void setCoins(int coins) {
         this.coins = coins;
+    }
+
+    public String getAvatar() {
+        return avatar;
+    }
+
+    public void setAvatar(String avatar) {
+        this.avatar = avatar;
     }
 }

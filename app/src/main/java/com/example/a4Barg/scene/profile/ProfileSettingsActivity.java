@@ -135,8 +135,8 @@ public class ProfileSettingsActivity extends BaseActivity {
             Log.d(TAG, "Observer: Avatar updated. Bytes is null: " + (avatarBytes == null));
             Glide.with(this)
                     .load(avatarBytes)
-                    .placeholder(R.drawable.ic_default_avatar)
-                    .error(R.drawable.ic_default_avatar)
+                    .placeholder(R.drawable.user_icon)
+                    .error(R.drawable.user_icon)
                     .circleCrop()
                     .into(ivProfilePic);
         });
@@ -272,7 +272,7 @@ public class ProfileSettingsActivity extends BaseActivity {
                 Glide.with(this)
                         .load(resultUri)
                         .circleCrop()
-                        .placeholder(R.drawable.ic_default_avatar)
+                        .placeholder(R.drawable.user_icon)
                         .into(ivProfilePic);
                 viewModel.setImageUriToUpload(resultUri);
             } else {

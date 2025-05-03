@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.common.BaseActivity;
+import com.example.a4Barg.scene.friends.FriendsActivity;
 import com.example.a4Barg.scene.profile.ProfileSettingsActivity;
 import com.example.a4Barg.scene.room.RoomActivity;
 import com.example.a4Barg.scene.roomlist.RoomListActivity;
@@ -22,7 +23,7 @@ import com.example.a4Barg.scene.roomlist.RoomListActivity;
 public class LobbyActivity extends BaseActivity {
 
     private LobbyViewModel viewModel;
-    private Button createRoomButton, joinRoomButton , profileButton;
+    private Button createRoomButton, joinRoomButton, friendsButton, profileButton;
     private ProgressBar progressBar;
 
     @Override
@@ -35,8 +36,9 @@ public class LobbyActivity extends BaseActivity {
         viewModel.setUserId(userId);
 
         createRoomButton = findViewById(R.id.createRoomButton);
-        profileButton = findViewById(R.id.ProfileSettingsButton);
         joinRoomButton = findViewById(R.id.joinRoomButton);
+        friendsButton = findViewById(R.id.friendsButton);
+        profileButton = findViewById(R.id.ProfileSettingsButton);
         progressBar = findViewById(R.id.progressBar);
 
         // Observer برای استاتوس لودینگ
@@ -60,9 +62,14 @@ public class LobbyActivity extends BaseActivity {
             startActivity(intent);
         });
 
+        friendsButton.setOnClickListener(v -> {
+            Intent intent = new Intent(LobbyActivity.this, FriendsActivity.class);
+            intent.putExtra("userId", userId);
+            startActivity(intent);
+        });
+
         profileButton.setOnClickListener(v -> startIntent(new Intent(LobbyActivity.this, ProfileSettingsActivity.class)));
     }
-
 
     private void showCreateRoomDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);

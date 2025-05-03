@@ -1,5 +1,6 @@
 package com.example.a4Barg.networking;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -15,12 +16,8 @@ import com.example.a4Barg.utils.RandomInteger;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import io.socket.client.Socket;
-import io.socket.emitter.Emitter;
-
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import io.socket.client.Socket;
+import io.socket.emitter.Emitter;
 
 public class SocketManager {
 
@@ -40,7 +40,7 @@ public class SocketManager {
     private static final List<GamePlayersInfoListener> gamePlayersInfoListeners = new ArrayList<>();
     private static final List<TurnUpdateListener> turnUpdateListeners = new ArrayList<>();
     private static final Map<String, List<CustomListener>> customListeners = new HashMap<>();
-    private static final Set<String> pendingRequests = new HashSet<>(); // برای جلوگیری از درخواست‌های تکراری
+    private static final Set<String> pendingRequests = new HashSet<>();
 
     public static void initialize(Context context, String userId) {
         SocketManager.context = context;
@@ -63,6 +63,11 @@ public class SocketManager {
                     Log.e("TEST", "Error in avatar_status listener: " + e.getMessage());
                 }
             });
+            if (context instanceof Activity) {
+                requestMissedMessages((Activity) context, userId);
+            } else {
+                Log.e("SocketManager", "Context is not an Activity, cannot request missed messages");
+            }
         });
         socket.on(Socket.EVENT_CONNECT_ERROR, args -> {
             Log.e("TEST", "Socket connection error: " + (args[0] != null ? args[0].toString() : "unknown error"));
@@ -101,12 +106,18 @@ public class SocketManager {
                     List<CustomListener> listeners = customListeners.get(eventName);
                     if (listeners != null) {
                         for (CustomListener l : listeners) {
-                            l.onEvent(data);
+                            try {
+                                l.onEvent(data);
+                            } catch (Exception e) {
+                                Log.e("SocketManager", "Error in custom listener for " + eventName + ": " + e.getMessage());
+                            }
                         }
+                    } else {
+                        Log.w("SocketManager", "No listeners registered for event: " + eventName);
                     }
                 });
             } catch (Exception e) {
-                Log.e("TEST", "Error in custom listener for " + eventName + ": " + e.getMessage());
+                Log.e("SocketManager", "Error parsing custom event " + eventName + ": " + e.getMessage());
             }
         });
     }
@@ -210,6 +221,36 @@ public class SocketManager {
         }
     }
 
+    public static void requestMissedMessages(Activity activity, String userId) {
+        if (!socket.connected() || !isConnect) {
+            Log.e("SocketManager", "Cannot request missed messages: Socket not connected");
+            return;
+        }
+        try {
+            JSONObject data = new JSONObject();
+            data.put("event", "get_missed_messages");
+            data.put("userId", userId);
+            SocketRequest request = new SocketRequest(activity, data, new Response() {
+                @Override
+                public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    if (!isError && object.getBoolean("success")) {
+                        Log.d("SocketManager", "Missed messages received: " + object.toString());
+                    } else {
+                        Log.e("SocketManager", "Failed to load missed messages: " + object.getString("message"));
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    Log.e("SocketManager", "Error loading missed messages: " + t.getMessage());
+                }
+            });
+            sendRequest(activity, request);
+        } catch (JSONException e) {
+            Log.e("SocketManager", "Error preparing missed messages request: " + e.getMessage());
+        }
+    }
+
     public interface Response {
         void onResponse(JSONObject object, Boolean isError) throws JSONException;
         void onError(Throwable t);
@@ -301,11 +342,9 @@ public class SocketManager {
         String token = prefs.getString("token", null);
         String event = request.getJsonObject().getString("event");
 
-        // تولید یک کلید منحصر به فرد برای درخواست بر اساس event و requestId
         String requestId = request.getJsonObject().optString("id", UUID.randomUUID().toString());
         String requestKey = event + "_" + requestId;
 
-        // بررسی اینکه آیا درخواست قبلاً در حال پردازش است
         synchronized (pendingRequests) {
             if (pendingRequests.contains(requestKey)) {
                 Log.d("TEST", "Duplicate request detected, skipping: " + requestKey);
@@ -537,8 +576,13 @@ public class SocketManager {
                         event.equals("create_room_response") || event.equals("join_room_response") ||
                         event.equals("leave_room_response") || event.equals("get_room_list_response") ||
                         event.equals("game_loading_response") || event.equals("play_card_response") ||
-                        event.equals("get_profile_response") || event.equals("update_profile_response")
-                        || (event.equals("check_pending_avatar_response"))) {
+                        event.equals("get_profile_response") || event.equals("update_profile_response") ||
+                        event.equals("check_pending_avatar_response") ||
+                        event.equals("search_users_response") || event.equals("get_friend_requests_response") ||
+                        event.equals("get_friends_response") || event.equals("send_friend_request_response") ||
+                        event.equals("accept_friend_request_response") || event.equals("reject_friend_request_response") ||
+                        event.equals("send_private_message_response") || event.equals("receive_private_message") ||
+                        event.equals("get_missed_messages_response") || event.equals("load_messages_response")) {
                     if (success) {
                         if (event.equals("login_response") || event.equals("register_response")) {
                             ConsValue.isRegistered = true;
@@ -855,7 +899,6 @@ public class SocketManager {
         }
 
         try {
-            // خواندن تصویر به‌صورت بایت
             InputStream inputStream = context.getContentResolver().openInputStream(imageUri);
             if (inputStream == null) {
                 callback.onError("خطا در خواندن تصویر");
@@ -871,19 +914,16 @@ public class SocketManager {
             inputStream.close();
             byte[] imageBytes = baos.toByteArray();
 
-            // تنظیم اندازه تکه‌ها (مثلاً 16KB)
             final int CHUNK_SIZE = 16 * 1024;
             int totalChunks = (int) Math.ceil((double) imageBytes.length / CHUNK_SIZE);
             String uploadId = UUID.randomUUID().toString();
 
-            // ارسال اطلاعات اولیه آپلود
             JSONObject initData = new JSONObject();
             initData.put("uploadId", uploadId);
             initData.put("userId", userId);
             initData.put("totalChunks", totalChunks);
             socket.emit("upload_avatar_init", initData);
 
-            // ارسال تکه‌ها
             for (int i = 0; i < totalChunks; i++) {
                 int start = i * CHUNK_SIZE;
                 int end = Math.min(start + CHUNK_SIZE, imageBytes.length);
@@ -894,11 +934,10 @@ public class SocketManager {
                 chunkData.put("uploadId", uploadId);
                 chunkData.put("chunkIndex", i);
                 chunkData.put("totalChunks", totalChunks);
-                chunkData.put("userId", userId); // اضافه کردن userId به هر تکه
+                chunkData.put("userId", userId);
                 socket.emit("upload_avatar_chunk", chunkData, chunk);
             }
 
-            // گوش دادن به پاسخ سرور
             socket.once("upload_avatar_complete_" + uploadId, args -> {
                 try {
                     JSONObject response = (JSONObject) args[0];

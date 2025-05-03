@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center"
-    android:background="@drawable/paper_background">
+    android:background="@drawable/basebackground">
 
     <Button
         android:id="@+id/createRoomButton"
@@ -20,15 +20,22 @@
         android:text="پیوستن به اتاق"
         android:layout_below="@id/createRoomButton"
         android:layout_margin="16dp"/>
+
+    <Button
+        android:id="@+id/friendsButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="لیست دوستان"
+        android:layout_below="@id/joinRoomButton"
+        android:layout_margin="16dp"/>
+
     <Button
         android:id="@+id/ProfileSettingsButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="تنظیمات پروفایل"
-        android:layout_below="@id/joinRoomButton"
+        android:layout_below="@id/friendsButton"
         android:layout_margin="16dp"/>
-
-
 
     <ProgressBar
         android:id="@+id/progressBar"

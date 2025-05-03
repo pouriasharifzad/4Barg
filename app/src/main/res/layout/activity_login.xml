@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/loginbg">
+    android:background="@drawable/basebackground">
 
     <ImageView
         android:id="@+id/image_view_logo"
@@ -93,7 +93,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="@font/vazirmatn"
             android:hint="رمز عبور"
-            android:inputType="textEmailAddress"
+            android:inputType="textPassword"
             android:padding="12dp"
             android:text=""
             android:textColor="@color/gold"
