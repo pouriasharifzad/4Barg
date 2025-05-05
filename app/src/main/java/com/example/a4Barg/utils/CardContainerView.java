@@ -8,6 +8,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.animation.ObjectAnimator;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.model.Card;
@@ -49,6 +50,7 @@ public class CardContainerView extends FrameLayout {
     private static final int PLAY_THRESHOLD = 200;
 
     private float[] lastCardPosition = new float[]{0f, 0f}; // مختصات آخرین کارت برای TABLE
+    private List<ImageView> highlightedCards = new ArrayList<>();
 
     public CardContainerView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -330,6 +332,31 @@ public class CardContainerView extends FrameLayout {
                 return false;
             }
         });
+    }
+
+    public void highlightCards(List<Card> cardsToHighlight, int color) {
+        clearHighlights();
+        for (Card card : cardsToHighlight) {
+            int index = cards.indexOf(card);
+            if (index != -1) {
+                ImageView cardView = cardViews.get(index);
+                highlightedCards.add(cardView);
+                ObjectAnimator animator = ObjectAnimator.ofFloat(cardView, "alpha", 0.5f, 1f);
+                animator.setDuration(500);
+                animator.setRepeatCount(ObjectAnimator.INFINITE);
+                animator.setRepeatMode(ObjectAnimator.REVERSE);
+                animator.start();
+            }
+        }
+    }
+
+    public void clearHighlights() {
+        for (ImageView cardView : highlightedCards) {
+            cardView.clearAnimation();
+            cardView.setAlpha(1f);
+            cardView.clearColorFilter();
+        }
+        highlightedCards.clear();
     }
 
     public interface OnCardPlayedListener {

@@ -4,7 +4,6 @@ import android.app.Application;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.widget.Toast;
 
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
@@ -40,7 +39,7 @@ public class GameViewModel extends AndroidViewModel {
     private final MutableLiveData<String[]> opponentInfo = new MutableLiveData<>();
     private final MutableLiveData<Integer> userSurs = new MutableLiveData<>(0);
     private final MutableLiveData<Integer> opponentSurs = new MutableLiveData<>(0);
-    private final MutableLiveData<List<List<Card>>> possibleCombinations = new MutableLiveData<>();
+    private final MutableLiveData<List<List<Card>>> possibleOptions = new MutableLiveData<>();
     private final MutableLiveData<Boolean> gameOver = new MutableLiveData<>(false);
     private final MutableLiveData<Integer> userScore = new MutableLiveData<>(0);
     private final MutableLiveData<Integer> opponentScore = new MutableLiveData<>(0);
@@ -141,6 +140,7 @@ public class GameViewModel extends AndroidViewModel {
                         if (isAnimating) {
                             pendingTableCardsUpdate = cards;
                         } else {
+                            Log.d("GameViewModel", "Updating table cards: " + cards.size() + " cards");
                             tableCards.setValue(cards);
                         }
                     }
@@ -150,7 +150,7 @@ public class GameViewModel extends AndroidViewModel {
 
             @Override
             public void onPlayerCardsError(Throwable t) {
-                activity.runOnUiThread(() -> Toast.makeText(activity, "خطا در دریافت کارت‌ها: " + t.getMessage(), Toast.LENGTH_SHORT).show());
+                activity.runOnUiThread(() -> Log.e("GameViewModel", "Error receiving player cards: " + t.getMessage()));
             }
         });
 
@@ -299,6 +299,7 @@ public class GameViewModel extends AndroidViewModel {
                         if (isAnimating) {
                             pendingTableCardsUpdate = cards;
                         } else {
+                            Log.d("GameViewModel", "Updating table cards from game state: " + cards.size() + " cards");
                             tableCards.setValue(cards);
                         }
                     }
@@ -337,7 +338,7 @@ public class GameViewModel extends AndroidViewModel {
                         }
                     }
                     if (data.has("surEvent") && data.getBoolean("surEvent")) {
-                        activity.runOnUiThread(() -> Toast.makeText(activity, "سور زده شد!", Toast.LENGTH_SHORT).show());
+                        activity.runOnUiThread(() -> Log.d("GameViewModel", "Sur event triggered!"));
                     }
                 } catch (JSONException e) {
                 }
@@ -384,7 +385,7 @@ public class GameViewModel extends AndroidViewModel {
 
                                 @Override
                                 public void onGamePlayersInfoError(Throwable t) {
-                                    activity.runOnUiThread(() -> Toast.makeText(activity, "خطا در دریافت اطلاعات بازیکن‌ها: " + t.getMessage(), Toast.LENGTH_SHORT).show());
+                                    activity.runOnUiThread(() -> Log.e("GameViewModel", "Error receiving player info: " + t.getMessage()));
                                 }
                             });
                         }
@@ -417,8 +418,11 @@ public class GameViewModel extends AndroidViewModel {
                             }
                             combinations.add(combo);
                         }
-                        possibleCombinations.setValue(combinations);
-                        activity.runOnUiThread(() -> Toast.makeText(activity, "لطفاً کارت‌های مورد نظرت رو انتخاب کن", Toast.LENGTH_LONG).show());
+                        setPossibleOptions(combinations);
+                        activity.runOnUiThread(() -> {
+                            Log.d("GameViewModel", "Select combination triggered with options: " + combinations.size());
+                            activity.showOptions(combinations);
+                        });
                     }
                 } catch (JSONException e) {
                 }
@@ -441,8 +445,11 @@ public class GameViewModel extends AndroidViewModel {
                             singleCardList.add(new Card(option.getString("suit"), option.getString("value")));
                             options.add(singleCardList);
                         }
-                        possibleCombinations.setValue(options);
-                        activity.runOnUiThread(() -> Toast.makeText(activity, "لطفاً " + pendingCard.getRank() + " مورد نظرت رو انتخاب کن", Toast.LENGTH_LONG).show());
+                        setPossibleOptions(options);
+                        activity.runOnUiThread(() -> {
+                            Log.d("GameViewModel", "Select king or queen triggered with options: " + options.size());
+                            activity.showOptions(options);
+                        });
                     }
                 } catch (JSONException e) {
                 }
@@ -474,25 +481,26 @@ public class GameViewModel extends AndroidViewModel {
                     boolean isUser = playerId.equals(userId);
                     boolean isCollected = data.optBoolean("isCollected", false);
 
-                    String message;
                     if (isCollected) {
-                        message = String.format("کارت %s of %s از (%s) بازی شد\nکارت جمع می‌شود",
-                                value, suit, isUser ? "شما" : "حریف");
-                        activity.runOnUiThread(() -> {
-                            Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
-                            if (isUser) {
-                                activity.getUserHandView().removeCardFromHand(playedCard);
-                            }
-                        });
+                        Log.d("GameViewModel", String.format("Card %s of %s collected by %s", value, suit, isUser ? "user" : "opponent"));
+                        List<Card> currentTableCards = tableCards.getValue();
+                        if (currentTableCards != null) {
+                            List<Card> updatedTableCards = new ArrayList<>(currentTableCards);
+                            updatedTableCards.removeAll(data.has("tableCards") ? parseCards(data.getJSONArray("tableCards")) : new ArrayList<>());
+                            updatedTableCards.remove(playedCard);
+                            tableCards.setValue(updatedTableCards);
+                            Log.d("GameViewModel", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
+                        }
+                        if (isUser) {
+                            activity.runOnUiThread(() -> activity.getUserHandView().removeCardFromHand(playedCard));
+                        }
                     } else {
                         isAnimating = true;
                         float[] lastCardPosition = activity.getTableView().getLastCardPosition();
                         float endX = lastCardPosition[0];
                         float endY = lastCardPosition[1];
-                        message = String.format("کارت %s of %s از (%s) بازی شد\nموقعیت مقصد: (%.2f, %.2f)",
-                                value, suit, isUser ? "شما" : "حریف", endX, endY);
+                        Log.d("GameViewModel", String.format("Card %s of %s played by %s to position (%.2f, %.2f)", value, suit, isUser ? "user" : "opponent", endX, endY));
                         activity.runOnUiThread(() -> {
-                            Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
                             float startX, startY, startRotation;
                             if (isUser) {
                                 startX = lastDropX;
@@ -507,14 +515,13 @@ public class GameViewModel extends AndroidViewModel {
                             activity.animateCard(playedCard, isUser, startX, startY, startRotation, () -> {
                                 isAnimating = false;
                                 if (pendingTableCardsUpdate != null) {
+                                    Log.d("GameViewModel", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
                                     tableCards.setValue(pendingTableCardsUpdate);
                                     pendingTableCardsUpdate = null;
                                 }
                             });
                         });
                     }
-
-                    Log.d("GameViewModel", "Played card position: " + message);
                 } catch (JSONException e) {
                     Log.e("GameViewModel", "Error parsing played_card event: " + e.getMessage());
                 }
@@ -522,35 +529,77 @@ public class GameViewModel extends AndroidViewModel {
         });
     }
 
+    private List<Card> parseCards(JSONArray cardsArray) throws JSONException {
+        List<Card> cards = new ArrayList<>();
+        for (int i = 0; i < cardsArray.length(); i++) {
+            JSONObject cardObj = cardsArray.getJSONObject(i);
+            cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
+        }
+        return cards;
+    }
+
     public void playCard(Card card, List<Card> tableCardsToCollect) {
+        if (card == null) {
+            Log.e("GameViewModel", "Attempted to play a null card");
+            return;
+        }
+        StringBuilder collectLog = new StringBuilder("Collecting cards: ");
+        for (Card c : tableCardsToCollect) {
+            collectLog.append(c.toString()).append(", ");
+        }
+        Log.d("GameViewModel", "Playing card: " + card.toString() + ", " + collectLog);
         JSONObject data = new JSONObject();
         try {
             data.put("event", "play_card");
             data.put("gameId", gameId);
             data.put("userId", userId);
             data.put("card", new JSONObject().put("suit", card.getSuit()).put("value", card.getRank()));
-            JSONArray tableCardsJson = new JSONArray();
-            for (Card c : tableCardsToCollect) {
-                tableCardsJson.put(new JSONObject().put("suit", c.getSuit()).put("value", c.getRank()));
+            if (tableCardsToCollect.isEmpty()) {
+                data.put("isAddToTable", true); // فلگ برای اضافه کردن کارت به زمین
+            } else {
+                JSONArray tableCardsJson = new JSONArray();
+                for (Card c : tableCardsToCollect) {
+                    tableCardsJson.put(new JSONObject().put("suit", c.getSuit()).put("value", c.getRank()));
+                }
+                data.put("tableCards", tableCardsJson);
             }
-            data.put("tableCards", tableCardsJson);
             SocketRequest request = new SocketRequest(null, data, new SocketManager.Response() {
                 @Override
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
                     if (!isError && object.getBoolean("success")) {
+                        Log.d("GameViewModel", "Play card successful, resetting pendingCard and options");
                         new Handler(Looper.getMainLooper()).post(() -> {
                             pendingCard = null;
-                            possibleCombinations.setValue(null);
+                            setPossibleOptions(null);
+                        });
+                    } else {
+                        Log.e("GameViewModel", "Play card failed: " + (isError ? "Error" : object.optString("message", "Unknown")));
+                        new Handler(Looper.getMainLooper()).post(() -> {
+                            pendingCard = null;
+                            setPossibleOptions(null);
+                            activity.showError("خطا در ارسال درخواست به سرور. لطفاً دوباره تلاش کنید.");
                         });
                     }
                 }
 
                 @Override
                 public void onError(Throwable t) {
+                    Log.e("GameViewModel", "Play card error: " + t.getMessage());
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        pendingCard = null;
+                        setPossibleOptions(null);
+                        activity.showError("خطا در ارسال درخواست به سرور. لطفاً دوباره تلاش کنید.");
+                    });
                 }
             });
             SocketManager.sendRequest(getApplication(), request);
         } catch (JSONException e) {
+            Log.e("GameViewModel", "Error creating play card JSON: " + e.getMessage());
+            new Handler(Looper.getMainLooper()).post(() -> {
+                pendingCard = null;
+                setPossibleOptions(null);
+                activity.showError("خطا در پردازش درخواست. لطفاً دوباره تلاش کنید.");
+            });
         }
     }
 
@@ -586,6 +635,11 @@ public class GameViewModel extends AndroidViewModel {
         this.lastDropRotation = rotation;
     }
 
+    public void setPendingCard(Card card) {
+        this.pendingCard = card;
+        Log.d("GameViewModel", "Pending card set to: " + (card != null ? card.toString() : "null"));
+    }
+
     public LiveData<List<Card>> getUserCards() { return userCards; }
     public LiveData<Integer> getOpponentCardCount() { return opponentCardCount; }
     public LiveData<List<Card>> getTableCards() { return tableCards; }
@@ -596,7 +650,7 @@ public class GameViewModel extends AndroidViewModel {
     public LiveData<String[]> getOpponentInfo() { return opponentInfo; }
     public LiveData<Integer> getUserSurs() { return userSurs; }
     public LiveData<Integer> getOpponentSurs() { return opponentSurs; }
-    public LiveData<List<List<Card>>> getPossibleCombinations() { return possibleCombinations; }
+    public LiveData<List<List<Card>>> getPossibleOptions() { return possibleOptions; }
     public LiveData<Boolean> getGameOver() { return gameOver; }
     public LiveData<Integer> getUserScore() { return userScore; }
     public LiveData<Integer> getOpponentScore() { return opponentScore; }
@@ -604,6 +658,23 @@ public class GameViewModel extends AndroidViewModel {
     public LiveData<String> getGameResultText() { return gameResultText; }
     public LiveData<InGameMessage> getInGameMessage() { return inGameMessage; }
     public Card getPendingCard() { return pendingCard; }
+
+    public void setPossibleOptions(List<List<Card>> options) {
+        if (options == null) {
+            pendingCard = null;
+        }
+        possibleOptions.setValue(options);
+    }
+
+    public void selectOption(List<Card> selectedOption) {
+        if (pendingCard == null) {
+            Log.e("GameViewModel", "Pending card is null, cannot select option. Current options: " + (possibleOptions.getValue() != null ? possibleOptions.getValue().size() : 0));
+            setPossibleOptions(null);
+            return;
+        }
+        Log.d("GameViewModel", "Selecting option with pending card: " + pendingCard.toString() + ", selected cards: " + selectedOption.size());
+        playCard(pendingCard, selectedOption);
+    }
 
     public CardContainerView getUserHandView() {
         return activity.getUserHandView();
