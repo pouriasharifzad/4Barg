@@ -23,7 +23,9 @@ import com.example.a4Barg.networking.SocketManager;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class ChatActivity extends AppCompatActivity {
@@ -98,9 +100,8 @@ public class ChatActivity extends AppCompatActivity {
             }
         });
 
-        // بارگذاری پیام‌ها و وضعیت
+        // بارگذاری پیام‌ها (وضعیت هم در این مرحله دریافت می‌شود)
         viewModel.loadMessages(this);
-        viewModel.checkStatus();
     }
 
     private void sendMessage(String message) {
@@ -120,8 +121,8 @@ public class ChatActivity extends AppCompatActivity {
                         if (currentMessages == null) {
                             currentMessages = new ArrayList<>();
                         }
-                        String timestamp = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-                                .format(new java.util.Date());
+                        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+                        String timestamp = sdf.format(new Date());
                         Message newMessage = new Message(currentUserId, targetUserId, message, timestamp);
                         currentMessages.add(newMessage);
                         viewModel.getMessages().postValue(currentMessages);

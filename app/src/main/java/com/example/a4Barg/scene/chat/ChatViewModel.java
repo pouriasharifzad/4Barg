@@ -15,6 +15,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,8 +24,9 @@ public class ChatViewModel extends AndroidViewModel {
     private String userId;
     private String targetUserId;
     private MutableLiveData<List<Message>> messages = new MutableLiveData<>(new ArrayList<>());
-    private MutableLiveData<String> status = new MutableLiveData<>("آنلاین");
+    private MutableLiveData<String> status = new MutableLiveData<>("آفلاین"); // Default to offline
     private SocketManager.CustomListener messageListener;
+    private SocketManager.UserStatusUpdateListener statusListener;
 
     public ChatViewModel(Application application) {
         super(application);
@@ -61,11 +63,11 @@ public class ChatViewModel extends AndroidViewModel {
                 @Override
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
                     if (object.getBoolean("success")) {
+                        // Load messages
                         JSONArray jsonMessages = object.getJSONArray("messages");
                         List<Message> messageList = new ArrayList<>();
                         for (int i = 0; i < jsonMessages.length(); i++) {
                             JSONObject jsonMessage = jsonMessages.getJSONObject(i);
-                            // استخراج sender و receiver از ObjectId یا رشته مستقیم
                             String sender = jsonMessage.has("sender") && jsonMessage.get("sender") instanceof JSONObject
                                     ? jsonMessage.getJSONObject("sender").getString("_id")
                                     : jsonMessage.getString("sender");
@@ -73,11 +75,17 @@ public class ChatViewModel extends AndroidViewModel {
                                     ? jsonMessage.getJSONObject("receiver").getString("_id")
                                     : jsonMessage.getString("receiver");
                             String messageText = jsonMessage.getString("message");
-                            String timestamp = jsonMessage.getString("timestamp");
+                            String timestamp = jsonMessage.getString("timestamp"); // فرمت جدید: "2025-05-03 14:06"
                             Message message = new Message(sender, receiver, messageText, timestamp);
                             messageList.add(message);
                         }
                         messages.postValue(messageList);
+
+                        // Set initial status from response
+                        if (object.has("targetUserStatus")) {
+                            String targetStatus = object.getString("targetUserStatus");
+                            updateStatusDisplay(targetStatus);
+                        }
                     } else {
                         Log.e("ChatViewModel", "Failed to load messages: " + object.getString("message"));
                     }
@@ -94,11 +102,22 @@ public class ChatViewModel extends AndroidViewModel {
         }
 
         setupMessageListener();
+        setupStatusListener();
     }
 
-    public void checkStatus() {
-        // اینجا می‌تونیم از سرور وضعیت رو چک کنیم (بعداً پیاده‌سازی می‌شه)
-        // فعلاً فقط یه مقدار پیش‌فرض می‌دیم
+    private void updateStatusDisplay(String statusValue) {
+        switch (statusValue) {
+            case "online":
+                status.postValue("آنلاین");
+                break;
+            case "in_game":
+                status.postValue("در حال بازی");
+                break;
+            case "offline":
+            default:
+                status.postValue("آفلاین");
+                break;
+        }
     }
 
     private void setupMessageListener() {
@@ -112,7 +131,7 @@ public class ChatViewModel extends AndroidViewModel {
                             sender,
                             receiver,
                             messageData.getString("message"),
-                            messageData.getString("timestamp")
+                            messageData.getString("timestamp") // فرمت جدید: "2025-05-03 14:06"
                     );
                     List<Message> currentMessages = messages.getValue();
                     if (currentMessages == null) {
@@ -128,9 +147,21 @@ public class ChatViewModel extends AndroidViewModel {
         SocketManager.addCustomListener("receive_private_message", messageListener);
     }
 
+    private void setupStatusListener() {
+        statusListener = (userId, statusValue) -> {
+            if (userId.equals(targetUserId)) {
+                updateStatusDisplay(statusValue);
+            }
+        };
+        SocketManager.addUserStatusUpdateListener(statusListener);
+    }
+
     public void cleanup() {
         if (messageListener != null) {
             SocketManager.addCustomListener("receive_private_message", messageListener);
+        }
+        if (statusListener != null) {
+            SocketManager.removeUserStatusUpdateListener(statusListener);
         }
     }
 }

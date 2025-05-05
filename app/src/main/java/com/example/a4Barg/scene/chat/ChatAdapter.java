@@ -37,7 +37,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.ViewHolder> {
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Message message = messages.get(position);
         holder.messageTextView.setText(message.getMessage());
-        holder.timestampTextView.setText(message.getTimestamp());
+        holder.timestampTextView.setText(message.getTimestamp()); // فرمت جدید: "2025-05-03 14:06"
 
         // تنظیم جهت پیام بر اساس فرستنده
         if (message.getSender().equals(currentUserId)) {
@@ -45,7 +45,8 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.ViewHolder> {
             holder.messageTextView.setBackgroundResource(R.drawable.sent_message_background);
             holder.itemView.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             holder.messageTextView.setGravity(android.view.Gravity.END);
-            holder.timestampTextView.setGravity(android.view.Gravity.END);
+            holder.timestampTextView.setGravity(android.view.Gravity.START);
+            holder.timestampTextView.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         } else {
             // پیام دریافتی (سمت چپ)
             holder.messageTextView.setBackgroundResource(R.drawable.received_message_background);

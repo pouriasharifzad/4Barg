@@ -39,6 +39,7 @@ public class SocketManager {
     private static final List<PlayerCardsListener> playerCardsListeners = new ArrayList<>();
     private static final List<GamePlayersInfoListener> gamePlayersInfoListeners = new ArrayList<>();
     private static final List<TurnUpdateListener> turnUpdateListeners = new ArrayList<>();
+    private static final List<UserStatusUpdateListener> userStatusUpdateListeners = new ArrayList<>(); // New listener for user status updates
     private static final Map<String, List<CustomListener>> customListeners = new HashMap<>();
     private static final Set<String> pendingRequests = new HashSet<>();
 
@@ -93,6 +94,15 @@ public class SocketManager {
 
     public static void addTurnUpdateListener(TurnUpdateListener listener) {
         turnUpdateListeners.add(listener);
+    }
+
+    // Add listener for user status updates
+    public static void addUserStatusUpdateListener(UserStatusUpdateListener listener) {
+        userStatusUpdateListeners.add(listener);
+    }
+
+    public static void removeUserStatusUpdateListener(UserStatusUpdateListener listener) {
+        userStatusUpdateListeners.remove(listener);
     }
 
     public static void addCustomListener(String eventName, CustomListener listener) {
@@ -180,6 +190,24 @@ public class SocketManager {
                         listener.onTurnUpdateError(e);
                     }
                 });
+            }
+        });
+
+        // Listener for user status updates
+        socket.on("user_status_update", args -> {
+            try {
+                JSONObject data = (JSONObject) args[0];
+                String userId = data.getString("userId");
+                String status = data.getString("status");
+                Log.d("TEST", "Received user_status_update: userId=" + userId + ", status=" + status);
+                Handler mainHandler = new Handler(Looper.getMainLooper());
+                mainHandler.post(() -> {
+                    for (UserStatusUpdateListener listener : userStatusUpdateListeners) {
+                        listener.onUserStatusUpdate(userId, status);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e("SocketManager", "Error in user_status_update listener: " + e.getMessage());
             }
         });
 
@@ -318,6 +346,11 @@ public class SocketManager {
 
     public interface CustomListener {
         void onEvent(JSONObject data);
+    }
+
+    // New interface for user status updates
+    public interface UserStatusUpdateListener {
+        void onUserStatusUpdate(String userId, String status);
     }
 
     public interface UploadCallback {
