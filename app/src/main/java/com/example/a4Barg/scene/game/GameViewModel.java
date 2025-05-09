@@ -140,7 +140,7 @@ public class GameViewModel extends AndroidViewModel {
                         if (isAnimating) {
                             pendingTableCardsUpdate = cards;
                         } else {
-                            Log.d("GameViewModel", "Updating table cards: " + cards.size() + " cards");
+                            Log.d("TableCards", "Received table cards from server: " + cards.size() + " cards");
                             tableCards.setValue(cards);
                         }
                     }
@@ -209,7 +209,7 @@ public class GameViewModel extends AndroidViewModel {
                         if (isAnimating) {
                             pendingTableCardsUpdate = cards;
                         } else {
-                            Log.d("GameViewModel", "Updating table cards from game state: " + cards.size() + " cards");
+                            Log.d("TableCards", "Received table cards from game state: " + cards.size() + " cards");
                             tableCards.setValue(cards);
                         }
                     }
@@ -316,7 +316,7 @@ public class GameViewModel extends AndroidViewModel {
                     String receivedUserId = data.getString("userId");
                     if (receivedUserId.equals(userId)) {
                         JSONObject cardObj = data.getJSONObject("card");
-                        pendingCard = new Card(cardObj.getString("suit"), cardObj.getString("value"));
+                        pendingCard = new Card(cardObj.getString("suit"), cardObj.optString("value", "unknown"));
                         JSONArray combinationsArray = data.getJSONArray("combinations");
                         List<List<Card>> combinations = new ArrayList<>();
                         for (int i = 0; i < combinationsArray.length(); i++) {
@@ -346,7 +346,7 @@ public class GameViewModel extends AndroidViewModel {
                     String receivedUserId = data.getString("userId");
                     if (receivedUserId.equals(userId)) {
                         JSONObject cardObj = data.getJSONObject("card");
-                        pendingCard = new Card(cardObj.getString("suit"), cardObj.getString("value"));
+                        pendingCard = new Card(cardObj.getString("suit"), cardObj.optString("value", "unknown"));
                         JSONArray optionsArray = data.getJSONArray("options");
                         List<List<Card>> options = new ArrayList<>();
                         for (int i = 0; i < optionsArray.length(); i++) {
@@ -394,7 +394,7 @@ public class GameViewModel extends AndroidViewModel {
                     if (data.has("tableCards")) {
                         JSONArray tableCardsArray = data.getJSONArray("tableCards");
                         tableCardsToCollect = parseCards(tableCardsArray);
-                        Log.d("GameViewModel", "Received tableCardsToCollect from server: " + tableCardsToCollect.size() + " cards - " + tableCardsToCollect.toString());
+                        Log.d("TableCards", "Received tableCardsToCollect from server: " + tableCardsToCollect.size() + " cards - " + tableCardsToCollect.toString());
                     } else {
                         Log.w("GameViewModel", "No tableCards found in played_card event, assuming empty");
                     }
@@ -424,10 +424,10 @@ public class GameViewModel extends AndroidViewModel {
                                     updatedTableCards.removeAll(finalTableCardsToCollect1);
                                     updatedTableCards.remove(playedCard);
                                     tableCards.setValue(updatedTableCards);
-                                    Log.d("GameViewModel", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
+                                    Log.d("TableCards", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
                                 }
                                 if (pendingTableCardsUpdate != null) {
-                                    Log.d("GameViewModel", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
+                                    Log.d("TableCards", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
                                     tableCards.setValue(pendingTableCardsUpdate);
                                     pendingTableCardsUpdate = null;
                                 }
@@ -438,7 +438,7 @@ public class GameViewModel extends AndroidViewModel {
                         float[] lastCardPosition = activity.getTableView().getLastCardPosition();
                         float endX = lastCardPosition[0];
                         float endY = lastCardPosition[1];
-                        Log.d("GameViewModel", String.format("Card %s of %s played by %s to position (%.2f, %.2f)", value, suit, isUser ? "user" : "opponent", endX, endY));
+                        Log.d("TableCards", String.format("Card %s of %s played by %s to position (%.2f, %.2f)", value, suit, isUser ? "user" : "opponent", endX, endY));
                         List<Card> finalTableCardsToCollect2 = tableCardsToCollect;
                         activity.runOnUiThread(() -> {
                             float startX, startY, startRotation;
@@ -455,7 +455,7 @@ public class GameViewModel extends AndroidViewModel {
                             activity.animateCard(playedCard, isUser, startX, startY, startRotation, finalTableCardsToCollect2, () -> {
                                 isAnimating = false;
                                 if (pendingTableCardsUpdate != null) {
-                                    Log.d("GameViewModel", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
+                                    Log.d("TableCards", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
                                     tableCards.setValue(pendingTableCardsUpdate);
                                     pendingTableCardsUpdate = null;
                                 }

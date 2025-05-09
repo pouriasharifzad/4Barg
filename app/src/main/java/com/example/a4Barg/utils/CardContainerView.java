@@ -53,6 +53,10 @@ public class CardContainerView extends ConstraintLayout {
     private float[] lastCardPosition = new float[]{0f, 0f}; // مختصات آخرین کارت برای TABLE
     private List<ImageView> highlightedCards = new ArrayList<>();
 
+    // متغیر برای ذخیره اندازه کارت روی زمین
+    private float tableCardWidth = 0f;
+    private float tableCardHeight = 0f;
+
     public CardContainerView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
@@ -173,6 +177,10 @@ public class CardContainerView extends ConstraintLayout {
         return new float[]{0f, 0f};
     }
 
+    public float[] getTableCardSize() {
+        return new float[]{tableCardWidth, tableCardHeight};
+    }
+
     public void removeCardFromHand(Card card) {
         if (type == Type.HAND) {
             int index = cards.indexOf(card);
@@ -241,6 +249,8 @@ public class CardContainerView extends ConstraintLayout {
         int count = cardViews.size();
         if (count == 0) {
             lastCardPosition = new float[]{0f, 0f};
+            tableCardWidth = 0f;
+            tableCardHeight = 0f;
             return;
         }
 
@@ -250,6 +260,10 @@ public class CardContainerView extends ConstraintLayout {
         int availableWidth = screenWidth - (padding * (cardsPerRow + 1));
         int cardWidth = availableWidth / cardsPerRow;
         int cardHeightPx = (int) (cardWidth * 1.5);
+
+        // ذخیره اندازه کارت‌های روی زمین
+        tableCardWidth = cardWidth;
+        tableCardHeight = cardHeightPx;
 
         for (ImageView cardView : cardViews) {
             ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
@@ -298,6 +312,9 @@ public class CardContainerView extends ConstraintLayout {
                         startY = event.getRawY();
                         cardStartY = v.getY();
                         draggedCard = (ImageView) v;
+                        // افزایش elevation برای اطمینان از نمایش در بالای tableView
+                        draggedCard.setElevation(15f);
+                        draggedCard.bringToFront();
                         return true;
 
                     case MotionEvent.ACTION_MOVE:
@@ -320,9 +337,13 @@ public class CardContainerView extends ConstraintLayout {
                                 float rotation = draggedCard.getRotation();
                                 cardPlayedListener.onCardPlayed(card, globalDropX, globalDropY, rotation);
                             }
+                            // بازگرداندن elevation به حالت اولیه
+                            draggedCard.setElevation(0f);
                         } else {
                             draggedCard.setX(v.getLeft());
                             draggedCard.setY(cardStartY);
+                            // بازگرداندن elevation به حالت اولیه
+                            draggedCard.setElevation(0f);
                             draggedCard = null;
                             requestLayout();
                         }
