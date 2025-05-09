@@ -6,9 +6,10 @@ import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.animation.ObjectAnimator;
+
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.model.Card;
@@ -16,7 +17,7 @@ import com.example.a4Barg.model.Card;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CardContainerView extends FrameLayout {
+public class CardContainerView extends ConstraintLayout {
     public enum Type {
         HAND, TABLE
     }
@@ -72,7 +73,7 @@ public class CardContainerView extends FrameLayout {
 
         for (Card card : newCards) {
             ImageView cardView = new ImageView(getContext());
-            cardView.setLayoutParams(new LayoutParams(cardWidth, cardHeightPx));
+            cardView.setLayoutParams(new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx));
             if (type == Type.HAND && showCards) {
                 int resId = getResources().getIdentifier(card.getImageResourceName(), "drawable", getContext().getPackageName());
                 cardView.setImageResource(resId != 0 ? resId : R.drawable.card_back);
@@ -251,9 +252,7 @@ public class CardContainerView extends FrameLayout {
         int cardHeightPx = (int) (cardWidth * 1.5);
 
         for (ImageView cardView : cardViews) {
-            LayoutParams params = (LayoutParams) cardView.getLayoutParams();
-            params.width = cardWidth;
-            params.height = cardHeightPx;
+            ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
             cardView.setLayoutParams(params);
         }
 

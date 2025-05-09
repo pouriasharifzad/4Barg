@@ -197,96 +197,6 @@ public class GameViewModel extends AndroidViewModel {
                                     userScoreValue, opponentScoreValue, winnerMessage
                             );
                             gameResultText.setValue(resultText);
-
-                            List<Card> userCards = userCollectedCards.getValue();
-                            List<Card> opponentCards = opponentCollectedCards.getValue();
-                            int userSursCount = userSurs.getValue() != null ? userSurs.getValue() : 0;
-                            int opponentSursCount = opponentSurs.getValue() != null ? opponentSurs.getValue() : 0;
-
-                            StringBuilder userLog = new StringBuilder("User Collected Cards (Scoring):\n");
-                            StringBuilder opponentLog = new StringBuilder("Opponent Collected Cards (Scoring):\n");
-
-                            if (userCards != null) {
-                                userLog.append("Clubs: ");
-                                for (Card card : userCards) {
-                                    if ("Clubs".equals(card.getSuit())) {
-                                        userLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                userLog.append("\n");
-                            }
-                            if (opponentCards != null) {
-                                opponentLog.append("Clubs: ");
-                                for (Card card : opponentCards) {
-                                    if ("Clubs".equals(card.getSuit())) {
-                                        opponentLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                opponentLog.append("\n");
-                            }
-
-                            if (userCards != null) {
-                                userLog.append("10 of Diamonds: ");
-                                for (Card card : userCards) {
-                                    if ("Diamonds".equals(card.getSuit()) && "10".equals(card.getRank())) {
-                                        userLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                userLog.append("\n");
-                            }
-                            if (opponentCards != null) {
-                                opponentLog.append("10 of Diamonds: ");
-                                for (Card card : opponentCards) {
-                                    if ("Diamonds".equals(card.getSuit()) && "10".equals(card.getRank())) {
-                                        opponentLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                opponentLog.append("\n");
-                            }
-
-                            if (userCards != null) {
-                                userLog.append("Aces: ");
-                                for (Card card : userCards) {
-                                    if ("Ace".equals(card.getRank())) {
-                                        userLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                userLog.append("\n");
-                            }
-                            if (opponentCards != null) {
-                                opponentLog.append("Aces: ");
-                                for (Card card : opponentCards) {
-                                    if ("Ace".equals(card.getRank())) {
-                                        opponentLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                opponentLog.append("\n");
-                            }
-
-                            if (userCards != null) {
-                                userLog.append("Jacks: ");
-                                for (Card card : userCards) {
-                                    if ("Jack".equals(card.getRank())) {
-                                        userLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                userLog.append("\n");
-                            }
-                            if (opponentCards != null) {
-                                opponentLog.append("Jacks: ");
-                                for (Card card : opponentCards) {
-                                    if ("Jack".equals(card.getRank())) {
-                                        opponentLog.append(card.getSuit()).append(" ").append(card.getRank()).append(", ");
-                                    }
-                                }
-                                opponentLog.append("\n");
-                            }
-
-                            userLog.append("Surs: ").append(userSursCount).append("\n");
-                            opponentLog.append("Surs: ").append(opponentSursCount).append("\n");
-
-                            Log.d("score", userLog.toString());
-                            Log.d("score", opponentLog.toString());
                         }
                     }
                     if (data.has("tableCards")) {
@@ -480,26 +390,20 @@ public class GameViewModel extends AndroidViewModel {
                     Card playedCard = new Card(suit, value);
                     boolean isUser = playerId.equals(userId);
                     boolean isCollected = data.optBoolean("isCollected", false);
+                    List<Card> tableCardsToCollect = new ArrayList<>();
+                    if (data.has("tableCards")) {
+                        JSONArray tableCardsArray = data.getJSONArray("tableCards");
+                        tableCardsToCollect = parseCards(tableCardsArray);
+                        Log.d("GameViewModel", "Received tableCardsToCollect from server: " + tableCardsToCollect.size() + " cards - " + tableCardsToCollect.toString());
+                    } else {
+                        Log.w("GameViewModel", "No tableCards found in played_card event, assuming empty");
+                    }
 
                     if (isCollected) {
                         Log.d("GameViewModel", String.format("Card %s of %s collected by %s", value, suit, isUser ? "user" : "opponent"));
-                        List<Card> currentTableCards = tableCards.getValue();
-                        if (currentTableCards != null) {
-                            List<Card> updatedTableCards = new ArrayList<>(currentTableCards);
-                            updatedTableCards.removeAll(data.has("tableCards") ? parseCards(data.getJSONArray("tableCards")) : new ArrayList<>());
-                            updatedTableCards.remove(playedCard);
-                            tableCards.setValue(updatedTableCards);
-                            Log.d("GameViewModel", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
-                        }
-                        if (isUser) {
-                            activity.runOnUiThread(() -> activity.getUserHandView().removeCardFromHand(playedCard));
-                        }
-                    } else {
                         isAnimating = true;
-                        float[] lastCardPosition = activity.getTableView().getLastCardPosition();
-                        float endX = lastCardPosition[0];
-                        float endY = lastCardPosition[1];
-                        Log.d("GameViewModel", String.format("Card %s of %s played by %s to position (%.2f, %.2f)", value, suit, isUser ? "user" : "opponent", endX, endY));
+                        List<Card> finalTableCardsToCollect = tableCardsToCollect;
+                        List<Card> finalTableCardsToCollect1 = tableCardsToCollect;
                         activity.runOnUiThread(() -> {
                             float startX, startY, startRotation;
                             if (isUser) {
@@ -512,7 +416,43 @@ public class GameViewModel extends AndroidViewModel {
                                 startY = activity.getOpponentHandView().getY() + (activity.getOpponentHandView().getHeight() / 2f);
                                 startRotation = 0f;
                             }
-                            activity.animateCard(playedCard, isUser, startX, startY, startRotation, () -> {
+                            activity.animateCard(playedCard, isUser, startX, startY, startRotation, finalTableCardsToCollect, () -> {
+                                isAnimating = false;
+                                List<Card> currentTableCards = tableCards.getValue();
+                                if (currentTableCards != null) {
+                                    List<Card> updatedTableCards = new ArrayList<>(currentTableCards);
+                                    updatedTableCards.removeAll(finalTableCardsToCollect1);
+                                    updatedTableCards.remove(playedCard);
+                                    tableCards.setValue(updatedTableCards);
+                                    Log.d("GameViewModel", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
+                                }
+                                if (pendingTableCardsUpdate != null) {
+                                    Log.d("GameViewModel", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
+                                    tableCards.setValue(pendingTableCardsUpdate);
+                                    pendingTableCardsUpdate = null;
+                                }
+                            });
+                        });
+                    } else {
+                        isAnimating = true;
+                        float[] lastCardPosition = activity.getTableView().getLastCardPosition();
+                        float endX = lastCardPosition[0];
+                        float endY = lastCardPosition[1];
+                        Log.d("GameViewModel", String.format("Card %s of %s played by %s to position (%.2f, %.2f)", value, suit, isUser ? "user" : "opponent", endX, endY));
+                        List<Card> finalTableCardsToCollect2 = tableCardsToCollect;
+                        activity.runOnUiThread(() -> {
+                            float startX, startY, startRotation;
+                            if (isUser) {
+                                startX = lastDropX;
+                                startY = lastDropY;
+                                startRotation = lastDropRotation;
+                                activity.getUserHandView().removeCardFromHand(playedCard);
+                            } else {
+                                startX = activity.getOpponentHandView().getX() + (activity.getOpponentHandView().getWidth() / 2f);
+                                startY = activity.getOpponentHandView().getY() + (activity.getOpponentHandView().getHeight() / 2f);
+                                startRotation = 0f;
+                            }
+                            activity.animateCard(playedCard, isUser, startX, startY, startRotation, finalTableCardsToCollect2, () -> {
                                 isAnimating = false;
                                 if (pendingTableCardsUpdate != null) {
                                     Log.d("GameViewModel", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
@@ -543,6 +483,11 @@ public class GameViewModel extends AndroidViewModel {
             Log.e("GameViewModel", "Attempted to play a null card");
             return;
         }
+        if (gameId == null || gameId.isEmpty()) {
+            Log.e("GameViewModel", "gameId is null or empty, cannot play card");
+            activity.showError("بازی پیدا نشد. لطفاً دوباره تلاش کنید.");
+            return;
+        }
         StringBuilder collectLog = new StringBuilder("Collecting cards: ");
         for (Card c : tableCardsToCollect) {
             collectLog.append(c.toString()).append(", ");
@@ -554,8 +499,8 @@ public class GameViewModel extends AndroidViewModel {
             data.put("gameId", gameId);
             data.put("userId", userId);
             data.put("card", new JSONObject().put("suit", card.getSuit()).put("value", card.getRank()));
-            if (tableCardsToCollect.isEmpty()) {
-                data.put("isAddToTable", true); // فلگ برای اضافه کردن کارت به زمین
+            if (tableCardsToCollect == null || tableCardsToCollect.isEmpty()) {
+                data.put("isAddToTable", true);
             } else {
                 JSONArray tableCardsJson = new JSONArray();
                 for (Card c : tableCardsToCollect) {
@@ -577,7 +522,7 @@ public class GameViewModel extends AndroidViewModel {
                         new Handler(Looper.getMainLooper()).post(() -> {
                             pendingCard = null;
                             setPossibleOptions(null);
-                            activity.showError("خطا در ارسال درخواست به سرور. لطفاً دوباره تلاش کنید.");
+                            activity.showError("خطا در ارسال درخواست به سرور: " + object.optString("message", "لطفاً دوباره تلاش کنید."));
                         });
                     }
                 }

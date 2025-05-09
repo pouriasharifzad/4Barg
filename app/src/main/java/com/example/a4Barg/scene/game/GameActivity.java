@@ -1,15 +1,21 @@
+
+
+
 package com.example.a4Barg.scene.game;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.graphics.Color;
-import android.graphics.PorterDuff; // <-- Import اضافه شد
+import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.DisplayMetrics;
-import android.util.Log; // <-- برای لاگ‌گیری احتمالی اضافه شد
+import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -42,7 +48,7 @@ public class GameActivity extends AppCompatActivity {
     private CollectedCardsView opponentCollectedCardsView;
     private String userId;
     private String roomNumber;
-    private String gameId; // Note: gameId is declared but not initialized or used in the provided code
+    private String gameId;
     private TextView userUsername, userExp, userCoins, userSurs;
     private TextView opponentUsername, opponentExp, opponentCoins, opponentSurs;
     private TextView turnIndicator;
@@ -54,7 +60,6 @@ public class GameActivity extends AppCompatActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private ConstraintLayout rootLayout;
 
-    // --- اضافه شد: Map برای نگهداری انیمیشن‌های چشمک‌زن کارت‌های انتخاب شده ---
     private Map<ImageView, ObjectAnimator> selectedBlinkingAnimators = new HashMap<>();
 
     @Override
@@ -97,35 +102,25 @@ public class GameActivity extends AppCompatActivity {
         userHandView.setOnCardPlayedListener(new CardContainerView.OnCardPlayedListener() {
             @Override
             public void onCardPlayed(Card card, float dropX, float dropY, float rotation) {
-                // --- پاک کردن انتخاب‌های قبلی قبل از شروع فرآیند جدید ---
                 clearAllBlinkingSelections();
-                tableView.clearHighlights(); // پاک کردن هایلایت‌های قبلی CardContainerView
-                // ----------------------------------------------------
-
-                viewModel.setPendingCard(card); // Set the pending card immediately
+                tableView.clearHighlights();
+                viewModel.setPendingCard(card);
                 List<Card> tableCards = tableView.getCards();
                 int playedValue = getCardValue(card.getRank());
                 List<List<Card>> combinations = findCombinations(tableCards, playedValue);
 
-                // selectedTableCards should be already cleared by clearAllBlinkingSelections()
-                // tableView.clearHighlights(); // Already called above
-
                 if (combinations.isEmpty()) {
-                    // هیچ ترکیبی وجود نداره، کارت به زمین اضافه بشه
                     viewModel.playCard(card, new ArrayList<>());
                 } else if (combinations.size() == 1) {
-                    // فقط یه ترکیب وجود داره، خودکار جمع بشه
                     viewModel.playCard(card, combinations.get(0));
                 } else {
-                    // چندین ترکیب ممکنه، کاربر باید انتخاب کنه
                     tableView.setSelectable(true);
-                    showOptions(combinations); // Highlight possible options (alpha blink, no color)
+                    showOptions(combinations);
                 }
                 viewModel.setLastDropPosition(dropX, dropY, rotation);
             }
         });
 
-        // --- تغییرات اصلی در setOnCardSelectedListener ---
         tableView.setOnCardSelectedListener(card -> {
             if (viewModel.getPendingCard() == null) {
                 Log.w("GameActivity", "Card selected but no pending card!");
@@ -136,69 +131,47 @@ public class GameActivity extends AppCompatActivity {
             int index = tableView.getCards().indexOf(card);
             if (index != -1) {
                 View childView = tableView.getChildAt(index);
-                // Ensure it's an ImageView before casting
                 if (childView instanceof ImageView) {
                     cardView = (ImageView) childView;
                 }
             }
-            // Exit if we couldn't find the corresponding ImageView
             if (cardView == null) {
                 Log.e("GameActivity", "Could not find ImageView for card: " + card.toString());
                 return;
             }
 
-            // --- منطق انتخاب / لغو انتخاب با استفاده از متدهای کمکی ---
             if (selectedTableCards.contains(card)) {
-                // --- Deselect ---
                 selectedTableCards.remove(card);
-                stopBlinkingGreen(cardView); // توقف چشمک‌زن و حذف فیلتر سبز
-
-                // Optional: Re-highlight general options if needed after deselect?
-                // This might be complex if the deselected card was the *only* selection.
-                // For now, rely on showOptions called initially.
-
+                stopBlinkingGreen(cardView);
             } else if (selectedTableCards.size() < tableView.getCards().size()) {
-                // --- Select ---
-                // First, stop any non-green blinking from showOptions if this card was highlighted there
-                cardView.clearAnimation(); // Stop CardContainerView's potential alpha blink
-                cardView.setAlpha(1f);     // Ensure full alpha before applying green blink
-
+                cardView.clearAnimation();
+                cardView.setAlpha(1f);
                 selectedTableCards.add(card);
-                startBlinkingGreen(cardView); // شروع چشمک‌زن سبز
+                startBlinkingGreen(cardView);
 
-                // Calculate total value of ONLY selected cards on table
                 int currentSelectionValue = calculateTotalValue(selectedTableCards);
-                // Get the value of the card played from hand
                 int cardPlayedValue = getCardValue(viewModel.getPendingCard().getRank());
 
                 if (cardPlayedValue + currentSelectionValue == 11) {
-                    // Combination is 11, finalize play
-                    List<Card> cardsToPlay = new ArrayList<>(selectedTableCards); // Copy selection *before* clearing
-                    clearAllBlinkingSelections(); // Stop blinking, clear filters, clear local lists/maps
-                    tableView.setSelectable(false); // Disable further selection
-                    tableView.clearHighlights(); // Clear any highlights from showOptions
-                    viewModel.playCard(viewModel.getPendingCard(), cardsToPlay); // Play the card
-
+                    List<Card> cardsToPlay = new ArrayList<>(selectedTableCards);
+                    clearAllBlinkingSelections();
+                    tableView.setSelectable(false);
+                    tableView.clearHighlights();
+                    viewModel.playCard(viewModel.getPendingCard(), cardsToPlay);
                 } else if (cardPlayedValue + currentSelectionValue > 11) {
-                    // Combination is invalid (over 11)
                     showError("مجموع " + (cardPlayedValue + currentSelectionValue) + " شد! ترکیب اشتباه است.");
-                    clearAllBlinkingSelections(); // Stop blinking, clear filters, clear local lists/maps
-                    tableView.setSelectable(true); // Allow selection again
+                    clearAllBlinkingSelections();
+                    tableView.setSelectable(true);
 
-                    // Re-show possible options
                     List<List<Card>> combinations = findCombinations(tableView.getCards(), cardPlayedValue);
                     if (!combinations.isEmpty()) {
-                        showOptions(combinations); // Highlight possible cards (alpha blink, no color)
+                        showOptions(combinations);
                     } else {
                         tableView.clearHighlights();
                     }
-                } else {
-                    // Combination is less than 11, continue selecting.
-                    // The card is already blinking green via startBlinkingGreen.
                 }
             }
         });
-        // --- پایان تغییرات در setOnCardSelectedListener ---
 
         btnInGameMessage.setOnClickListener(v -> showMessageDialog());
 
@@ -207,35 +180,28 @@ public class GameActivity extends AppCompatActivity {
 
         viewModel.startGame(roomNumber);
 
-        // --- Observers ---
         viewModel.getUserCards().observe(this, this::updateUserHand);
         viewModel.getOpponentCardCount().observe(this, this::updateOpponentHand);
         viewModel.getTableCards().observe(this, tableCards -> {
-            // When table cards update externally (e.g., opponent plays, deal),
-            // the current selection might become invalid. Clear it.
             List<Card> currentSelection = new ArrayList<>(selectedTableCards);
             boolean selectionStillValid = true;
             if (!currentSelection.isEmpty()) {
-                for(Card selectedCard : currentSelection) {
+                for (Card selectedCard : currentSelection) {
                     if (!tableCards.contains(selectedCard)) {
                         selectionStillValid = false;
                         break;
                     }
                 }
-                if(!selectionStillValid) {
+                if (!selectionStillValid) {
                     Log.d("GameActivity", "Table changed, clearing invalid selection.");
                     clearAllBlinkingSelections();
                 }
             }
-            updateTableCards(tableCards); // Update the view with new cards
+            updateTableCards(tableCards);
         });
         viewModel.getUserCollectedCards().observe(this, this::updateUserCollectedCards);
         viewModel.getOpponentCollectedCards().observe(this, this::updateOpponentCollectedCards);
-        viewModel.getCurrentTurn().observe(this, turnUserId -> {
-            // If turn changes, clear any pending selection state? Usually handled by playCard.
-            // clearAllBlinkingSelections(); // Maybe needed if a player can pass turn while selecting?
-            updateTurnIndicator(turnUserId);
-        });
+        viewModel.getCurrentTurn().observe(this, this::updateTurnIndicator);
         viewModel.getUserInfo().observe(this, info -> {
             userUsername.setText(info[0]);
             userExp.setText("EXP: " + info[1]);
@@ -249,22 +215,13 @@ public class GameActivity extends AppCompatActivity {
         viewModel.getUserSurs().observe(this, surs -> userSurs.setText("Surs: " + surs));
         viewModel.getOpponentSurs().observe(this, surs -> opponentSurs.setText("Surs: " + surs));
         viewModel.getPossibleOptions().observe(this, options -> {
-            // This observer is mainly for the ViewModel to potentially trigger
-            // the display of options if logic dictates, but the initial trigger
-            // is usually after onCardPlayed.
             if (options != null && !options.isEmpty()) {
-                // Don't automatically call showOptions here unless intended
-                // as it might override the user's current blinking selection.
-                // tableView.setSelectable(true);
-                // showOptions(options);
             } else {
-                // tableView.setSelectable(false);
-                // tableView.clearHighlights();
             }
         });
         viewModel.getGameOver().observe(this, gameOver -> {
             if (gameOver) {
-                clearAllBlinkingSelections(); // --- توقف چشمک‌زن‌ها در پایان بازی ---
+                clearAllBlinkingSelections();
                 userHandView.setEnabled(false);
                 tableView.setSelectable(false);
                 turnIndicator.setText("بازی تموم شد");
@@ -286,61 +243,41 @@ public class GameActivity extends AppCompatActivity {
         });
     }
 
-    // --- متدهای کمکی برای چشمک‌زن سبز ---
-
     private void startBlinkingGreen(ImageView cardView) {
         if (selectedBlinkingAnimators.containsKey(cardView)) {
             Log.w("GameActivity", "Already blinking green: " + cardView.toString());
-            return; // Already blinking this view
+            return;
         }
-        // Apply green overlay tint - image underneath should remain visible
-        cardView.setColorFilter(Color.GREEN, PorterDuff.Mode.OVERLAY); // Use OVERLAY
-
-        // Create and start blinking animation (adjust alpha range as needed)
-        ObjectAnimator animator = ObjectAnimator.ofFloat(cardView, "alpha", 0.6f, 1f); // Blink between 60% and 100% opaque
-        animator.setDuration(500); // Blinking speed
+        cardView.setColorFilter(Color.GREEN, PorterDuff.Mode.OVERLAY);
+        ObjectAnimator animator = ObjectAnimator.ofFloat(cardView, "alpha", 0.6f, 1f);
+        animator.setDuration(500);
         animator.setRepeatCount(ObjectAnimator.INFINITE);
         animator.setRepeatMode(ObjectAnimator.REVERSE);
         animator.start();
-
-        selectedBlinkingAnimators.put(cardView, animator); // Store the animator
+        selectedBlinkingAnimators.put(cardView, animator);
         Log.d("GameActivity", "Started blinking green: " + cardView.toString());
     }
 
     private void stopBlinkingGreen(ImageView cardView) {
         ObjectAnimator animator = selectedBlinkingAnimators.remove(cardView);
         if (animator != null) {
-            animator.cancel(); // Stop the animation
-        } else {
-            // If no animator was found in our map, maybe it wasn't blinking green?
-            // Still ensure filter and alpha are reset.
+            animator.cancel();
         }
-        // Remove tint and restore full alpha
         cardView.setColorFilter(null);
         cardView.setAlpha(1f);
-        Log.d("GameActivity", "Stopped blinking green: " + cardView.toString());
+        Log.d("animation", "Stopped blinking green: " + cardView.toString());
     }
 
-    // Call this method whenever the current selection needs to be completely reset
     private void clearAllBlinkingSelections() {
         Log.d("GameActivity", "Clearing all blinking selections.");
-        // Use a copy of the keys to avoid ConcurrentModificationException while iterating and removing
         List<ImageView> viewsToClear = new ArrayList<>(selectedBlinkingAnimators.keySet());
         for (ImageView view : viewsToClear) {
-            // The remove operation happens inside stopBlinkingGreen
             stopBlinkingGreen(view);
         }
-        // Map should be empty now, but clear for certainty
         selectedBlinkingAnimators.clear();
-        // Also clear the logical list of selected cards
         selectedTableCards.clear();
-
-        // It's generally safe to also clear CardContainerView's highlights here too,
-        // as any new interaction requiring options will call showOptions again.
         tableView.clearHighlights();
     }
-
-    // --- سایر متدها (بدون تغییر یا با تغییرات جزئی) ---
 
     private void showMessageDialog() {
         String[] messages = {"دمت گرم", "عجب بازیکنی", "بازی بلد نیستی", "من میبرم"};
@@ -357,13 +294,11 @@ public class GameActivity extends AppCompatActivity {
     private void showMessage(TextView textView, String message) {
         textView.setText(message);
         textView.setVisibility(View.VISIBLE);
-        handler.postDelayed(() -> textView.setVisibility(View.GONE), 5000); // 5 seconds
+        handler.postDelayed(() -> textView.setVisibility(View.GONE), 5000);
     }
 
     public void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-        // Consider clearing selection state on error as well?
-        // clearAllBlinkingSelections(); // Already called in the listener when sum > 11
     }
 
     private int getCardValue(String rank) {
@@ -378,20 +313,13 @@ public class GameActivity extends AppCompatActivity {
             case "8": return 8;
             case "9": return 9;
             case "10": return 10;
-            case "Jack": return 11; // Jack might need special handling if it cannot be collected
+            case "Jack": return 11;
             case "Queen": return 12;
             case "King": return 13;
             default: return 0;
         }
     }
 
-    // This method seems unused now
-    private List<Card> getCollectableCards(List<Card> tableCards, int playedValue) {
-        Log.w("GameActivity", "getCollectableCards is likely unused.");
-        return new ArrayList<>();
-    }
-
-    // Calculates value of a list of cards (used for selectedTableCards)
     private int calculateTotalValue(List<Card> cards) {
         int total = 0;
         for (Card card : cards) {
@@ -400,55 +328,43 @@ public class GameActivity extends AppCompatActivity {
         return total;
     }
 
-    // Finds combinations on the table that sum to (11 - playedCardValue)
     private List<List<Card>> findCombinations(List<Card> tableCards, int playedCardValue) {
         List<List<Card>> result = new ArrayList<>();
         int target = 11 - playedCardValue;
 
-        if (target <= 0) return result; // Cannot make 11 if played card is 11 or more
+        if (target <= 0) return result;
 
         List<Card> numericCards = new ArrayList<>();
         for (Card card : tableCards) {
             int value = getCardValue(card.getRank());
-            // Only consider cards on table that can be part of a sum (e.g., <= 10, or Ace=1)
-            // Jack, Queen, King usually cannot be picked up by numeric cards to make 11.
-            if (value <= 10) { // Adjust this condition based on game rules (e.g., if Ace can be 11 sometimes)
+            if (value <= 10) {
                 numericCards.add(card);
             }
-            // Handle Jack pickup: If played card is Jack, can it pick up other Jacks?
-            // Handle Sur scenario (sweeping table) - this seems handled elsewhere.
         }
 
-        // Find all subsets of numericCards that sum exactly to target
         int n = numericCards.size();
-        for (int i = 0; i < (1 << n); i++) { // Iterate through all possible subsets (2^n)
+        for (int i = 0; i < (1 << n); i++) {
             List<Card> currentCombination = new ArrayList<>();
             int currentSum = 0;
             for (int j = 0; j < n; j++) {
-                // Check if the j-th bit is set in i
                 if ((i & (1 << j)) > 0) {
                     Card card = numericCards.get(j);
                     currentSum += getCardValue(card.getRank());
                     currentCombination.add(card);
                 }
             }
-            // Add the combination if the sum matches the target
             if (currentSum == target) {
                 result.add(currentCombination);
             }
         }
-        // Log.d("GameActivity", "Found " + result.size() + " combinations for target " + target);
         return result;
     }
 
-    // Highlights possible cards to select from (uses CardContainerView's alpha blink)
     public void showOptions(List<List<Card>> options) {
-        tableView.clearHighlights(); // Clear previous CardContainerView highlights
+        tableView.clearHighlights();
         List<Card> collectableCards = new ArrayList<>();
         for (List<Card> option : options) {
             for (Card card : option) {
-                // Ensure we don't try to highlight a card already selected (blinking green)
-                // Find the view for the card
                 ImageView cardView = null;
                 int index = tableView.getCards().indexOf(card);
                 if (index != -1) {
@@ -457,8 +373,6 @@ public class GameActivity extends AppCompatActivity {
                         cardView = (ImageView) childView;
                     }
                 }
-
-                // Only add to collectableCards if it's not already blinking green
                 if (!collectableCards.contains(card) && cardView != null && !selectedBlinkingAnimators.containsKey(cardView)) {
                     collectableCards.add(card);
                 }
@@ -466,29 +380,18 @@ public class GameActivity extends AppCompatActivity {
         }
         if (!collectableCards.isEmpty()) {
             Log.d("GameActivity", "Highlighting options (alpha blink): " + collectableCards.size());
-            tableView.highlightCards(collectableCards, Color.argb(0, 0, 0, 0)); // Pass transparent color, CardContainerView handles alpha blink
+            tableView.highlightCards(collectableCards, Color.argb(0, 0, 0, 0));
         } else {
             Log.d("GameActivity", "No options to highlight (or they are already selected).");
         }
     }
 
-    // This method seems related to viewModel logic, not view interaction directly anymore
-    private void selectOption(List<Card> selectedOption) {
-        Log.w("GameActivity", "selectOption method called, likely handled by viewModel now.");
-        // This logic is now mostly inside the setOnCardSelectedListener
-        // Card pendingCard = viewModel.getPendingCard();
-        // ... validation ...
-        // viewModel.selectOption(selectedOption); // ViewModel might handle the state change
-    }
-
-    // Validates if played card + collected cards == 11
     private boolean validateCombination(Card playedCard, List<Card> tableCardsToCollect) {
         int playedValue = getCardValue(playedCard.getRank());
         int sum = playedValue + calculateTotalValue(tableCardsToCollect);
         return sum == 11;
     }
 
-    // --- Update View Methods ---
     private void updateUserHand(List<Card> cards) {
         userHandView.setCards(cards);
     }
@@ -496,15 +399,13 @@ public class GameActivity extends AppCompatActivity {
     private void updateOpponentHand(Integer cardCount) {
         List<Card> opponentCards = new ArrayList<>();
         for (int i = 0; i < cardCount; i++) {
-            // Use a placeholder or actual card back model if available
-            opponentCards.add(new Card("unknown", "unknown")); // Assuming Card("unknown", "unknown") maps to card_back
+            opponentCards.add(new Card("unknown", "unknown"));
         }
         opponentHandView.setCards(opponentCards);
     }
 
     private void updateTableCards(List<Card> tableCards) {
         tableView.setCards(tableCards);
-        // Note: Blinking selections might need re-validation here, handled partly in observer
     }
 
     private void updateUserCollectedCards(List<Card> cards) {
@@ -518,17 +419,15 @@ public class GameActivity extends AppCompatActivity {
     private void updateTurnIndicator(String turnUserId) {
         if (turnUserId != null && turnUserId.equals(userId)) {
             turnIndicator.setText("نوبت شما");
-            userHandView.setEnabled(true); // Enable hand interaction
+            userHandView.setEnabled(true);
         } else {
             turnIndicator.setText("نوبت حریف");
-            userHandView.setEnabled(false); // Disable hand interaction
-            // If it's not user's turn, they shouldn't be able to select from table either
+            userHandView.setEnabled(false);
             clearAllBlinkingSelections();
             tableView.setSelectable(false);
         }
     }
 
-    // --- Getters for Views (potentially used by ViewModel or other parts) ---
     public CardContainerView getTableView() {
         return tableView;
     }
@@ -541,60 +440,240 @@ public class GameActivity extends AppCompatActivity {
         return opponentHandView;
     }
 
-    // --- Animation for card played from hand/opponent ---
-    public void animateCard(Card card, boolean isUser, float startX, float startY, float startRotation, Runnable onAnimationEnd) {
+    public void animateCard(Card playedCard, boolean isUser, float startX, float startY, float startRotation, List<Card> tableCardsToCollect, Runnable onAnimationEnd) {
+        Log.d("animation", "Starting animateCard - Played Card: " + playedCard.toString() + ", Played by: " + (isUser ? "User" : "Opponent"));
+        Log.d("animation", "Source Position - Title: " + (isUser ? "User Hand (Drop Location)" : "Opponent Hand Center") + ", Coordinates: (" + startX + ", " + startY + "), Rotation: " + startRotation);
+        Log.d("animation", "Cards to Collect: " + (tableCardsToCollect == null ? "None" : tableCardsToCollect.toString()));
+
+        if (tableCardsToCollect == null || tableCardsToCollect.isEmpty()) {
+            Log.d("animation", "No cards to collect, animating directly to table.");
+            ImageView animatedCard = createAnimatedCard(playedCard);
+            animatedCard.setX(startX);
+            animatedCard.setY(startY);
+            animatedCard.setRotation(startRotation);
+            rootLayout.addView(animatedCard);
+            Log.d("animation", "Added played card to rootLayout at position: (" + startX + ", " + startY + ")");
+
+            tableView.post(() -> {
+                float[] lastCardPosition = tableView.getLastCardPosition();
+                float endX = tableView.getX() + lastCardPosition[0];
+                float endY = tableView.getY() + lastCardPosition[1];
+                Log.d("animation", "Destination Position - Title: Table (Last Card Position), Coordinates: (" + endX + ", " + endY + ")");
+
+                ObjectAnimator moveX = ObjectAnimator.ofFloat(animatedCard, "x", startX, endX);
+                ObjectAnimator moveY = ObjectAnimator.ofFloat(animatedCard, "y", startY, endY);
+                ObjectAnimator rotate = ObjectAnimator.ofFloat(animatedCard, "rotation", startRotation, 0f);
+
+                AnimatorSet animatorSet = new AnimatorSet();
+                animatorSet.playTogether(moveX, moveY, rotate);
+                animatorSet.setDuration(1000);
+                animatorSet.start();
+                Log.d("animation", "Started animation to table for card: " + playedCard.toString());
+
+                animatorSet.addListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        Log.d("animation", "Animation to table completed for card: " + playedCard.toString());
+                        rootLayout.removeView(animatedCard);
+                        Log.d("animation", "Removed played card from rootLayout");
+                        if (onAnimationEnd != null) {
+                            Log.d("animation", "Running onAnimationEnd callback.");
+                            onAnimationEnd.run();
+                        }
+                    }
+                });
+            });
+        } else {
+            Log.d("animation", "Cards to collect exist, starting collection animation.");
+            List<ImageView> collectedCardViews = new ArrayList<>();
+            ImageView playedCardView = createAnimatedCard(playedCard);
+            playedCardView.setX(startX);
+            playedCardView.setY(startY);
+            playedCardView.setRotation(startRotation);
+            rootLayout.addView(playedCardView);
+            collectedCardViews.add(playedCardView);
+            Log.d("animation", "Added played card to rootLayout at position: (" + startX + ", " + startY + ")");
+
+            List<ImageView> tableCardViews = new ArrayList<>();
+            for (Card tableCard : tableCardsToCollect) {
+                ImageView tableCardView = findTableCardView(tableCard);
+                if (tableCardView != null) {
+                    int[] tableCardLocation = new int[2];
+                    tableCardView.getLocationOnScreen(tableCardLocation);
+                    int[] rootLocation = new int[2];
+                    rootLayout.getLocationOnScreen(rootLocation);
+
+                    float tableCardX = tableCardLocation[0] - rootLocation[0];
+                    float tableCardY = tableCardLocation[1] - rootLocation[1];
+                    Log.d("animation", "Found table card: " + tableCard.toString() + " at position: (" + tableCardX + ", " + tableCardY + ")");
+
+                    // کارت اصلی در tableView باقی می‌ماند تا زمان اتمام انیمیشن مرحله‌ای
+                    tableCardViews.add(tableCardView);
+                } else {
+                    Log.w("animation", "Could not find table card view for: " + tableCard.toString());
+                }
+            }
+
+            AnimatorSet animatorSet = new AnimatorSet();
+            List<AnimatorSet> animators = new ArrayList<>();
+            float lastX = startX;
+            float lastY = startY;
+
+            for (int i = 0; i < tableCardViews.size(); i++) {
+                ImageView tableCardView = tableCardViews.get(i);
+                Card tableCard = tableCardsToCollect.get(i);
+
+                int[] tableCardLocation = new int[2];
+                tableCardView.getLocationOnScreen(tableCardLocation);
+                int[] rootLocation = new int[2];
+                rootLayout.getLocationOnScreen(rootLocation);
+
+                float overlapX = tableCardLocation[0] - rootLocation[0];
+                float overlapY = tableCardLocation[1] - rootLocation[1];
+                Log.d("animation", "Step " + (i + 1) + ": Moving to overlap position for card: " + tableCard.toString() + ", Target: (" + overlapX + ", " + overlapY + ")");
+
+                // جابجایی 20% به سمت راست برای کارت بازی‌شده
+                DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+                int cardWidth = (int) (120 * displayMetrics.density);
+                float offsetX = cardWidth * 0.2f; // 20% عرض کارت
+                overlapX += offsetX;
+
+                List<ObjectAnimator> stageAnimators = new ArrayList<>();
+                for (ImageView cardView : collectedCardViews) {
+                    String cardName = (cardView == playedCardView) ? playedCard.toString() : tableCardsToCollect.get(collectedCardViews.indexOf(cardView) - 1).toString();
+                    Log.d("animation", "Animating card: " + cardName + " from (" + lastX + ", " + lastY + ") to (" + overlapX + ", " + overlapY + ")");
+                    stageAnimators.add(ObjectAnimator.ofFloat(cardView, "x", lastX, overlapX));
+                    stageAnimators.add(ObjectAnimator.ofFloat(cardView, "y", lastY, overlapY));
+                    stageAnimators.add(ObjectAnimator.ofFloat(cardView, "rotation", cardView.getRotation(), 0f));
+                }
+
+                AnimatorSet stageAnimator = new AnimatorSet();
+                stageAnimator.playTogether(stageAnimators.toArray(new ObjectAnimator[0]));
+                stageAnimator.setDuration(1000);
+                animators.add(stageAnimator);
+                Log.d("animation", "Created overlap animation for step " + (i + 1));
+
+                int finalI = i; // برای دسترسی به index در listener
+                float finalOverlapX = overlapX;
+                stageAnimator.addListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        Log.d("animation", "Stage " + (finalI + 1) + " completed, removing table card: " + tableCard.toString());
+                        if (tableCardView.getParent() != null) {
+                            ((ViewGroup) tableCardView.getParent()).removeView(tableCardView);
+                        }
+                        rootLayout.addView(tableCardView);
+                        tableCardView.setX(finalOverlapX);
+                        tableCardView.setY(overlapY);
+                        collectedCardViews.add(tableCardView);
+                        Log.d("animation", "Added original table card to collectedCardViews: " + tableCard.toString());
+                    }
+                });
+
+                lastX = overlapX;
+                lastY = overlapY;
+            }
+
+            // انیمیشن نهایی به سمت collectedCards
+            View collectedView = isUser ? userCollectedCardsView : opponentCollectedCardsView;
+            int[] collectedLocation = new int[2];
+            collectedView.getLocationOnScreen(collectedLocation);
+            int[] rootLocation = new int[2];
+            rootLayout.getLocationOnScreen(rootLocation);
+
+            float collectedX = collectedLocation[0] - rootLocation[0] + collectedView.getWidth() / 2f - playedCardView.getWidth() / 2f;
+            float collectedY = collectedLocation[1] - rootLocation[1] + collectedView.getHeight() / 2f - playedCardView.getHeight() / 2f;
+            Log.d("animation", "Final Destination - Title: " + (isUser ? "User Collected Cards" : "Opponent Collected Cards") + ", Coordinates: (" + collectedX + ", " + collectedY + ")");
+
+            List<ObjectAnimator> finalAnimators = new ArrayList<>();
+            for (ImageView cardView : collectedCardViews) {
+                String cardName = (cardView == playedCardView) ? playedCard.toString() : tableCardsToCollect.get(collectedCardViews.indexOf(cardView) - 1).toString();
+                Log.d("animation", "Final Step: Moving card: " + cardName + " from overlap position: (" + lastX + ", " + lastY + ") to collected position: (" + collectedX + ", " + collectedY + ")");
+                cardView.setX(lastX);
+                cardView.setY(lastY);
+                finalAnimators.add(ObjectAnimator.ofFloat(cardView, "x", lastX, collectedX));
+                finalAnimators.add(ObjectAnimator.ofFloat(cardView, "y", lastY, collectedY));
+            }
+
+            AnimatorSet finalAnimatorSet = new AnimatorSet();
+            finalAnimatorSet.playTogether(finalAnimators.toArray(new ObjectAnimator[0]));
+            finalAnimatorSet.setDuration(1000);
+            animators.add(finalAnimatorSet);
+            Log.d("animation", "Created final animation to collected cards");
+
+            for (int i = 0; i < animators.size(); i++) {
+                if (i == 0) {
+                    animatorSet.play(animators.get(i));
+                } else {
+                    animatorSet.play(animators.get(i)).after(animators.get(i - 1)).after(1000); // مکث 1 ثانیه‌ای بین مراحل
+                }
+            }
+
+            // تغییر تصویر کارت‌ها به پشت کارت قبل از انیمیشن نهایی
+            finalAnimatorSet.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationStart(Animator animation) {
+                    for (ImageView cardView : collectedCardViews) {
+                        String cardName = (cardView == playedCardView) ? playedCard.toString() : tableCardsToCollect.get(collectedCardViews.indexOf(cardView) - 1).toString();
+                        cardView.setImageResource(R.drawable.card_back);
+                        Log.d("animation", "Changed card image to card_back for: " + cardName + " before final animation");
+                    }
+                }
+            });
+
+            animatorSet.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    Log.d("animation", "Final animation to collected cards completed.");
+                    for (ImageView cardView : collectedCardViews) {
+                        rootLayout.removeView(cardView);
+                        Log.d("animation", "Removed card from rootLayout: " + (cardView == playedCardView ? playedCard.toString() : tableCardsToCollect.get(collectedCardViews.indexOf(cardView) - 1).toString()));
+                    }
+                    // پاکسازی کامل tableView از ویوهای باقیمانده
+                    for (int i = 0; i < tableView.getChildCount(); i++) {
+                        View child = tableView.getChildAt(i);
+                        if (child instanceof ImageView) {
+                            tableView.removeView(child);
+                            Log.d("animation", "Removed leftover view from tableView");
+                        }
+                    }
+                    if (onAnimationEnd != null) {
+                        Log.d("animation", "Running onAnimationEnd callback.");
+                        onAnimationEnd.run();
+                    }
+                }
+            });
+
+            Log.d("animation", "Starting animation sequence.");
+            animatorSet.start();
+        }
+    }
+
+    private ImageView createAnimatedCard(Card card) {
         ImageView animatedCard = new ImageView(this);
         int resId = getResources().getIdentifier(card.getImageResourceName(), "drawable", getPackageName());
         animatedCard.setImageResource(resId != 0 ? resId : R.drawable.card_back);
 
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        // Use consistent card size if possible, or fetch from resources/layout params
-        int cardWidth = (int) (100 * displayMetrics.density); // Adjust size as needed
-        int cardHeightPx = (int) (130 * displayMetrics.density); // Adjust size as needed
+        int cardWidth = (int) (120 * displayMetrics.density);
+        int cardHeightPx = (int) (138 * displayMetrics.density);
         ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
         animatedCard.setLayoutParams(params);
 
-        animatedCard.setElevation(25f); // Make sure it's above other cards
+        animatedCard.setElevation(100f);
+        animatedCard.setZ(100f);
 
-        // Set initial position and rotation based on where the card was played from
-        animatedCard.setX(startX);
-        animatedCard.setY(startY);
-        animatedCard.setRotation(startRotation);
+        return animatedCard;
+    }
 
-        rootLayout.addView(animatedCard); // Add to the main layout for animation
-
-        // Calculate target position on the table (e.g., next available slot)
-        tableView.post(() -> { // Ensure table layout is calculated before getting position
-            float[] lastCardPosition = tableView.getLastCardPosition(); // Get position from CardContainerView
-            float endX = tableView.getX() + lastCardPosition[0]; // Target X relative to rootLayout
-            float endY = tableView.getY() + lastCardPosition[1]; // Target Y relative to rootLayout
-
-            // Adjust startY if needed (e.g., opponent's card starts higher)
-            // float adjustedStartY = startY; // Keep original Y from parameters for now
-
-            ObjectAnimator moveX = ObjectAnimator.ofFloat(animatedCard, "x", startX, endX);
-            ObjectAnimator moveY = ObjectAnimator.ofFloat(animatedCard, "y", startY, endY);
-            ObjectAnimator rotate = ObjectAnimator.ofFloat(animatedCard, "rotation", startRotation, 0f); // Rotate to 0 degrees on table
-
-            AnimatorSet animatorSet = new AnimatorSet();
-            animatorSet.playTogether(moveX, moveY, rotate);
-            animatorSet.setDuration(800); // Animation duration (milliseconds)
-            animatorSet.start();
-
-            animatorSet.addListener(new android.animation.AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationEnd(android.animation.Animator animation) {
-                    // Remove the temporary animated view *after* animation ends
-                    rootLayout.removeView(animatedCard);
-                    // Run the callback (e.g., to update the table view state in ViewModel/Activity)
-                    if (onAnimationEnd != null) {
-                        onAnimationEnd.run();
-                    }
-                    // Note: The actual card is added to the tableView's data structure
-                    // by the updateTableCards method triggered by the ViewModel.
-                    // This animation is purely visual.
-                }
-            });
-        });
+    private ImageView findTableCardView(Card tableCard) {
+        int index = tableView.getCards().indexOf(tableCard);
+        if (index != -1) {
+            View childView = tableView.getChildAt(index);
+            if (childView instanceof ImageView) {
+                return (ImageView) childView;
+            }
+        }
+        return null;
     }
 }
