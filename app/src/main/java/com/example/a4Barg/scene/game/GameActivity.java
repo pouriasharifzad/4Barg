@@ -404,7 +404,6 @@ public class GameActivity extends AppCompatActivity {
 
     private void updateTableCards(List<Card> tableCards) {
         Log.d("TableCards", "Updating table cards with " + tableCards.size() + " cards");
-        // اطمینان از محاسبه ابعاد قبل از چیدمان کارت‌ها
         if (tableView.getWidth() == 0 || tableView.getHeight() == 0) {
             tableView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
                 @Override
@@ -467,15 +466,16 @@ public class GameActivity extends AppCompatActivity {
         Log.d("animation", "Source Position - Title: " + (isUser ? "User Hand (Drop Location)" : "Opponent Hand Center") + ", Coordinates: (" + startX + ", " + startY + "), Rotation: " + startRotation);
         Log.d("animation", "Cards to Collect: " + (tableCardsToCollect == null ? "None" : tableCardsToCollect.toString()));
 
-        // بدست آوردن اندازه کارت‌های روی زمین
         float[] tableCardSize = tableView.getTableCardSize();
         float targetWidth = tableCardSize[0];
         float targetHeight = tableCardSize[1];
+        Log.d("dimen", "Table card size: width=" + targetWidth + ", height=" + targetHeight);
 
-        // اندازه کارت اولیه (اندازه کارت در دست)
+        // اندازه‌های پیش‌فرض کارت (مانند متد createAnimatedCard)
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        float handCardWidth = (int) (120 * displayMetrics.density);
+        float tableAspectRatio = targetWidth / targetHeight;
         float handCardHeight = (int) (138 * displayMetrics.density);
+        float handCardWidth = handCardHeight * tableAspectRatio;
 
         if (tableCardsToCollect == null || tableCardsToCollect.isEmpty()) {
             Log.d("animation", "No cards to collect, animating directly to table.");
@@ -486,7 +486,6 @@ public class GameActivity extends AppCompatActivity {
             rootLayout.addView(animatedCard);
             Log.d("animation", "Added played card to rootLayout at position: (" + startX + ", " + startY + ")");
 
-            // تنظیم مقیاس اولیه (اندازه کارت در دست)
             animatedCard.setScaleX(1f);
             animatedCard.setScaleY(1f);
 
@@ -496,9 +495,11 @@ public class GameActivity extends AppCompatActivity {
                 float endY = tableView.getY() + lastCardPosition[1];
                 Log.d("animation", "Destination Position - Title: Table (Last Card Position), Coordinates: (" + endX + ", " + endY + ")");
 
-                // محاسبه مقیاس هدف (نسبت اندازه کارت روی زمین به اندازه کارت در دست)
                 float scaleX = targetWidth / handCardWidth;
                 float scaleY = targetHeight / handCardHeight;
+                float finalWidth = handCardWidth * scaleX;
+                float finalHeight = handCardHeight * scaleY;
+                Log.d("dimen", "Played card final size (on table): width=" + finalWidth + ", height=" + finalHeight);
 
                 ObjectAnimator moveX = ObjectAnimator.ofFloat(animatedCard, "x", startX, endX);
                 ObjectAnimator moveY = ObjectAnimator.ofFloat(animatedCard, "y", startY, endY);
@@ -532,7 +533,6 @@ public class GameActivity extends AppCompatActivity {
             playedCardView.setX(startX);
             playedCardView.setY(startY);
             playedCardView.setRotation(startRotation);
-            // تنظیم مقیاس اولیه کارت بازی‌شده
             playedCardView.setScaleX(1f);
             playedCardView.setScaleY(1f);
             rootLayout.addView(playedCardView);
@@ -552,7 +552,6 @@ public class GameActivity extends AppCompatActivity {
                     float tableCardY = tableCardLocation[1] - rootLocation[1];
                     Log.d("animation", "Found table card: " + tableCard.toString() + " at position: (" + tableCardX + ", " + tableCardY + ")");
 
-                    // کارت اصلی در tableView باقی می‌ماند تا زمان اتمام انیمیشن مرحله‌ای
                     tableCardViews.add(tableCardView);
                 } else {
                     Log.w("animation", "Could not find table card view for: " + tableCard.toString());
@@ -564,9 +563,11 @@ public class GameActivity extends AppCompatActivity {
             float lastX = startX;
             float lastY = startY;
 
-            // مقیاس هدف برای کارت‌های روی زمین که به مقصد (collected cards) می‌روند
             float finalScaleX = userCollectedCardsView.getWidth() / handCardWidth;
             float finalScaleY = userCollectedCardsView.getHeight() / handCardHeight;
+            float finalWidth = handCardWidth * finalScaleX;
+            float finalHeight = handCardHeight * finalScaleY;
+            Log.d("dimen", "Played card final size (in collected cards): width=" + finalWidth + ", height=" + finalHeight);
 
             for (int i = 0; i < tableCardViews.size(); i++) {
                 ImageView tableCardView = tableCardViews.get(i);
@@ -581,10 +582,9 @@ public class GameActivity extends AppCompatActivity {
                 float overlapY = tableCardLocation[1] - rootLocation[1];
                 Log.d("animation", "Step " + (i + 1) + ": Moving to overlap position for card: " + tableCard.toString() + ", Target: (" + overlapX + ", " + overlapY + ")");
 
-                // جابجایی 20% به سمت راست برای کارت بازی‌شده
                 displayMetrics = getResources().getDisplayMetrics();
                 int cardWidth = (int) (120 * displayMetrics.density);
-                float offsetX = cardWidth * 0.2f; // 20% عرض کارت
+                float offsetX = cardWidth * 0.2f;
                 overlapX += offsetX;
 
                 List<ObjectAnimator> stageAnimators = new ArrayList<>();
@@ -594,7 +594,6 @@ public class GameActivity extends AppCompatActivity {
                     stageAnimators.add(ObjectAnimator.ofFloat(cardView, "x", lastX, overlapX));
                     stageAnimators.add(ObjectAnimator.ofFloat(cardView, "y", lastY, overlapY));
                     stageAnimators.add(ObjectAnimator.ofFloat(cardView, "rotation", cardView.getRotation(), 0f));
-                    // تغییر مقیاس کارت بازی‌شده به اندازه کارت روی زمین
                     if (cardView == playedCardView) {
                         float scaleX = targetWidth / handCardWidth;
                         float scaleY = targetHeight / handCardHeight;
@@ -610,7 +609,7 @@ public class GameActivity extends AppCompatActivity {
                 animators.add(stageAnimator);
                 Log.d("animation", "Created overlap animation for step " + (i + 1));
 
-                int finalI = i; // برای دسترسی به index در listener
+                int finalI = i;
                 float finalOverlapX = overlapX;
                 stageAnimator.addListener(new AnimatorListenerAdapter() {
                     @Override
@@ -622,7 +621,6 @@ public class GameActivity extends AppCompatActivity {
                         rootLayout.addView(tableCardView);
                         tableCardView.setX(finalOverlapX);
                         tableCardView.setY(overlapY);
-                        // تنظیم مقیاس اولیه کارت‌های روی زمین
                         float scaleX = targetWidth / handCardWidth;
                         float scaleY = targetHeight / handCardHeight;
                         tableCardView.setScaleX(scaleX);
@@ -636,7 +634,6 @@ public class GameActivity extends AppCompatActivity {
                 lastY = overlapY;
             }
 
-            // انیمیشن نهایی به سمت collectedCards
             View collectedView = isUser ? userCollectedCardsView : opponentCollectedCardsView;
             int[] collectedLocation = new int[2];
             collectedView.getLocationOnScreen(collectedLocation);
@@ -655,7 +652,6 @@ public class GameActivity extends AppCompatActivity {
                 cardView.setY(lastY);
                 finalAnimators.add(ObjectAnimator.ofFloat(cardView, "x", lastX, collectedX));
                 finalAnimators.add(ObjectAnimator.ofFloat(cardView, "y", lastY, collectedY));
-                // تغییر مقیاس به اندازه collected cards
                 finalAnimators.add(ObjectAnimator.ofFloat(cardView, "scaleX", cardView.getScaleX(), finalScaleX));
                 finalAnimators.add(ObjectAnimator.ofFloat(cardView, "scaleY", cardView.getScaleY(), finalScaleY));
                 Log.d("animation", "Scaling card " + cardName + " to collected size: (" + finalScaleX + ", " + finalScaleY + ")");
@@ -671,11 +667,10 @@ public class GameActivity extends AppCompatActivity {
                 if (i == 0) {
                     animatorSet.play(animators.get(i));
                 } else {
-                    animatorSet.play(animators.get(i)).after(animators.get(i - 1)).after(1000); // مکث 1 ثانیه‌ای بین مراحل
+                    animatorSet.play(animators.get(i)).after(animators.get(i - 1)).after(1000);
                 }
             }
 
-            // تغییر تصویر کارت‌ها به پشت کارت قبل از انیمیشن نهایی
             finalAnimatorSet.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationStart(Animator animation) {
@@ -695,7 +690,6 @@ public class GameActivity extends AppCompatActivity {
                         rootLayout.removeView(cardView);
                         Log.d("animation", "Removed card from rootLayout: " + (cardView == playedCardView ? playedCard.toString() : tableCardsToCollect.get(collectedCardViews.indexOf(cardView) - 1).toString()));
                     }
-                    // پاکسازی کامل tableView از ویوهای باقیمانده
                     for (int i = 0; i < tableView.getChildCount(); i++) {
                         View child = tableView.getChildAt(i);
                         if (child instanceof ImageView) {
@@ -720,9 +714,19 @@ public class GameActivity extends AppCompatActivity {
         int resId = getResources().getIdentifier(card.getImageResourceName(), "drawable", getPackageName());
         animatedCard.setImageResource(resId != 0 ? resId : R.drawable.card_back);
 
+        // اندازه کارت روی زمین
+        float[] tableCardSize = tableView.getTableCardSize();
+        float targetWidth = tableCardSize[0];
+        float targetHeight = tableCardSize[1];
+
+        // محاسبه نسبت ابعاد کارت روی زمین
+        float tableAspectRatio = targetWidth / targetHeight;
+
+        // تنظیم اندازه اولیه کارت با حفظ نسبت ابعاد کارت روی زمین
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        int cardWidth = (int) (120 * displayMetrics.density);
-        int cardHeightPx = (int) (138 * displayMetrics.density);
+        int cardHeightPx = (int) (138 * displayMetrics.density); // ارتفاع ثابت
+        int cardWidth = (int) (cardHeightPx * tableAspectRatio); // عرض بر اساس نسبت ابعاد
+
         ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
         animatedCard.setLayoutParams(params);
 
