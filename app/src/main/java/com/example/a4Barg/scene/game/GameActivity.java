@@ -59,6 +59,7 @@ public class GameActivity extends AppCompatActivity {
     private ConstraintLayout rootLayout;
 
     private Map<ImageView, ObjectAnimator> selectedBlinkingAnimators = new HashMap<>();
+    private boolean isInitialTableCardsSet = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -391,7 +392,26 @@ public class GameActivity extends AppCompatActivity {
     }
 
     private void updateUserHand(List<Card> cards) {
+        Log.d("HandCards", "Updating user hand with " + (cards != null ? cards.size() : 0) + " cards");
+        if (cards == null || cards.isEmpty()) {
+            Log.d("HandCards", "No cards to display in user hand");
+            userHandView.setCards(new ArrayList<>());
+            return;
+        }
+        Log.d("HandCards", "Cards to display: " + cards.toString());
         userHandView.setCards(cards);
+        Log.d("HandCards", "Cards laid out in userHandView");
+        userHandView.post(() -> {
+            int count = userHandView.getCards().size();
+            if (count > 0) {
+                for (int i = 0; i < count; i++) {
+                    ImageView cardView = (ImageView) userHandView.getChildAt(i);
+                    Log.d("HandCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                    Log.d("HandCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                    Log.d("HandCards", "Card " + i + " rotation: " + cardView.getRotation());
+                }
+            }
+        });
     }
 
     private void updateOpponentHand(Integer cardCount) {
@@ -403,30 +423,170 @@ public class GameActivity extends AppCompatActivity {
     }
 
     private void updateTableCards(List<Card> tableCards) {
-        Log.d("TableCards", "Updating table cards with " + tableCards.size() + " cards");
-        if (tableView.getWidth() == 0 || tableView.getHeight() == 0) {
-            tableView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-                @Override
-                public void onGlobalLayout() {
-                    tableView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                    int screenWidth = tableView.getWidth();
-                    int screenHeight = tableView.getHeight();
-                    Log.d("TableCards", "TableView dimensions after layout: width=" + screenWidth + ", height=" + screenHeight);
-                    tableView.setCards(tableCards);
-                    Log.d("TableCards", "Cards laid out in tableView");
-                    float[] lastCardPos = tableView.getLastCardPosition();
-                    Log.d("TableCards", "Last card position: x=" + lastCardPos[0] + ", y=" + lastCardPos[1]);
-                }
-            });
-        } else {
-            int screenWidth = tableView.getWidth();
-            int screenHeight = tableView.getHeight();
-            Log.d("TableCards", "TableView dimensions: width=" + screenWidth + ", height=" + screenHeight);
-            tableView.setCards(tableCards);
-            Log.d("TableCards", "Cards laid out in tableView");
-            float[] lastCardPos = tableView.getLastCardPosition();
-            Log.d("TableCards", "Last card position: x=" + lastCardPos[0] + ", y=" + lastCardPos[1]);
+        Log.d("TableCards", "Updating table cards with " + (tableCards != null ? tableCards.size() : 0) + " cards");
+        if (tableCards == null || tableCards.isEmpty()) {
+            Log.d("TableCards", "No cards to display on table");
+            tableView.setCards(new ArrayList<>());
+            isInitialTableCardsSet = false;
+            return;
         }
+        Log.d("TableCards", "Cards to display: " + tableCards.toString());
+
+        if (tableCards.size() == 4 && !isInitialTableCardsSet) {
+            tableView.setInitialAnimationPending(true);
+            animateInitialTableCards(tableCards);
+            isInitialTableCardsSet = true;
+        } else {
+            if (tableView.getWidth() == 0 || tableView.getHeight() == 0) {
+                tableView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        tableView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        int screenWidth = tableView.getWidth();
+                        int screenHeight = tableView.getHeight();
+                        Log.d("TableCards", "TableView dimensions after layout: width=" + screenWidth + ", height=" + screenHeight);
+                        tableView.setCards(tableCards);
+                        Log.d("TableCards", "Cards laid out in tableView");
+                        float[] lastCardPos = tableView.getLastCardPosition();
+                        Log.d("TableCards", "Last card position: x=" + lastCardPos[0] + ", y=" + lastCardPos[1]);
+                        tableView.post(() -> {
+                            int count = tableView.getCards().size();
+                            if (count > 0) {
+                                for (int i = 0; i < count; i++) {
+                                    ImageView cardView = (ImageView) tableView.getChildAt(i);
+                                    Log.d("TableCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                                    Log.d("TableCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                                }
+                            }
+                        });
+                    }
+                });
+            } else {
+                int screenWidth = tableView.getWidth();
+                int screenHeight = tableView.getHeight();
+                Log.d("TableCards", "TableView dimensions: width=" + screenWidth + ", height=" + screenHeight);
+                tableView.setCards(tableCards);
+                Log.d("TableCards", "Cards laid out in tableView");
+                float[] lastCardPos = tableView.getLastCardPosition();
+                Log.d("TableCards", "Last card position: x=" + lastCardPos[0] + ", y=" + lastCardPos[1]);
+                tableView.post(() -> {
+                    int count = tableView.getCards().size();
+                    if (count > 0) {
+                        for (int i = 0; i < count; i++) {
+                            ImageView cardView = (ImageView) tableView.getChildAt(i);
+                            Log.d("TableCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                            Log.d("TableCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    private void animateInitialTableCards(List<Card> initialCards) {
+        if (initialCards.size() != 4) {
+            Log.w("TableCards", "animateInitialTableCards called with incorrect number of cards: " + initialCards.size());
+            return;
+        }
+
+        int screenWidth = tableView.getWidth();
+        int screenHeight = tableView.getHeight();
+        Log.d("TableCards", "TableView dimensions: width=" + screenWidth + ", height=" + screenHeight);
+
+        float cardWidth = 240;
+        float cardHeight = 360;
+        float aspectRatio = cardWidth / cardHeight;
+
+        float startX = screenWidth;
+        float startY = screenHeight / 2f - cardHeight / 2f;
+        Log.d("TableCards", "Animation start position: x=" + startX + ", y=" + startY);
+
+        float[] targetXs = new float[]{10, 260, 510, 760};
+        float[] targetYs = new float[]{10, 10, 10, 10};
+
+        tableView.setCards(new ArrayList<>());
+
+        List<ImageView> animatedCards = new ArrayList<>();
+        for (int i = 0; i < initialCards.size(); i++) {
+            Card card = initialCards.get(i);
+            ImageView cardView = createAnimatedCard(card);
+
+            ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) cardView.getLayoutParams();
+            params.width = (int) cardWidth;
+            params.height = (int) cardHeight;
+            cardView.setLayoutParams(params);
+            Log.d("TableCards", "Card " + i + " initial size: width=" + cardWidth + ", height=" + cardHeight);
+
+            cardView.setX(startX);
+            cardView.setY(startY);
+            cardView.setScaleX(0f); // اندازه اولیه صفر
+            cardView.setScaleY(0f); // اندازه اولیه صفر
+            cardView.setRotation(0f);
+
+            rootLayout.addView(cardView);
+            animatedCards.add(cardView);
+            Log.d("TableCards", "Added card " + i + " to rootLayout at position: x=" + startX + ", y=" + startY + " with initial scale: (0, 0)");
+        }
+
+        AnimatorSet fullAnimatorSet = new AnimatorSet();
+        List<Animator> cardAnimators = new ArrayList<>();
+
+        for (int i = 0; i < animatedCards.size(); i++) {
+            ImageView cardView = animatedCards.get(i);
+            float targetX = tableView.getX() + targetXs[i];
+            float targetY = tableView.getY() + targetYs[i];
+            Log.d("TableCards", "Card " + i + " target position: x=" + targetX + ", y=" + targetY);
+
+            ObjectAnimator moveX = ObjectAnimator.ofFloat(cardView, "x", startX, targetX);
+            ObjectAnimator moveY = ObjectAnimator.ofFloat(cardView, "y", startY, targetY);
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(cardView, "scaleX", 0f, 1f); // انیمیشن مقیاس از ۰ به ۱
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(cardView, "scaleY", 0f, 1f); // انیمیشن مقیاس از ۰ به ۱
+
+            AnimatorSet cardAnimator = new AnimatorSet();
+            cardAnimator.playTogether(moveX, moveY, scaleX, scaleY); // اضافه کردن انیمیشن مقیاس
+            cardAnimator.setDuration(1000);
+            cardAnimators.add(cardAnimator);
+
+            Log.d("TableCards", "Created animation for card " + i + " to position: x=" + targetX + ", y=" + targetY + " with scale from (0,0) to (1,1)");
+        }
+
+        for (int i = 0; i < cardAnimators.size(); i++) {
+            if (i == 0) {
+                fullAnimatorSet.play(cardAnimators.get(i));
+            } else {
+                fullAnimatorSet.play(cardAnimators.get(i)).after(cardAnimators.get(i - 1)).after(500);
+            }
+        }
+
+        fullAnimatorSet.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                Log.d("TableCards", "Initial cards animation completed");
+                tableView.setCards(initialCards);
+                Log.d("TableCards", "Cards laid out in tableView after animation");
+
+                for (ImageView cardView : animatedCards) {
+                    rootLayout.removeView(cardView);
+                    Log.d("TableCards", "Removed animated card from rootLayout");
+                }
+
+                tableView.setInitialAnimationPending(false);
+
+                tableView.post(() -> {
+                    int count = tableView.getCards().size();
+                    if (count > 0) {
+                        for (int i = 0; i < count; i++) {
+                            ImageView cardView = (ImageView) tableView.getChildAt(i);
+                            Log.d("TableCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                            Log.d("TableCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                        }
+                    }
+                });
+            }
+        });
+
+        fullAnimatorSet.start();
+        Log.d("TableCards", "Started animation for initial 4 cards");
     }
 
     private void updateUserCollectedCards(List<Card> cards) {
@@ -471,7 +631,6 @@ public class GameActivity extends AppCompatActivity {
         float targetHeight = tableCardSize[1];
         Log.d("dimen", "Table card size: width=" + targetWidth + ", height=" + targetHeight);
 
-        // اندازه‌های پیش‌فرض کارت (مانند متد createAnimatedCard)
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
         float tableAspectRatio = targetWidth / targetHeight;
         float handCardHeight = (int) (138 * displayMetrics.density);
@@ -714,18 +873,15 @@ public class GameActivity extends AppCompatActivity {
         int resId = getResources().getIdentifier(card.getImageResourceName(), "drawable", getPackageName());
         animatedCard.setImageResource(resId != 0 ? resId : R.drawable.card_back);
 
-        // اندازه کارت روی زمین
         float[] tableCardSize = tableView.getTableCardSize();
         float targetWidth = tableCardSize[0];
         float targetHeight = tableCardSize[1];
 
-        // محاسبه نسبت ابعاد کارت روی زمین
         float tableAspectRatio = targetWidth / targetHeight;
 
-        // تنظیم اندازه اولیه کارت با حفظ نسبت ابعاد کارت روی زمین
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        int cardHeightPx = (int) (138 * displayMetrics.density); // ارتفاع ثابت
-        int cardWidth = (int) (cardHeightPx * tableAspectRatio); // عرض بر اساس نسبت ابعاد
+        int cardHeightPx = (int) (138 * displayMetrics.density);
+        int cardWidth = (int) (cardHeightPx * tableAspectRatio);
 
         ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
         animatedCard.setLayoutParams(params);

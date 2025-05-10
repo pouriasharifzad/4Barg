@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageView;
@@ -32,30 +33,28 @@ public class CardContainerView extends ConstraintLayout {
     private OnCardPlayedListener cardPlayedListener; // فقط برای HAND
     private OnCardSelectedListener onCardSelectedListener; // فقط برای TABLE
 
-    // متغیرهای مربوط به چیدمان HAND
     private final int overlap = 100;
     private final int angleFactor = 7;
     private final int cardHeight = 138;
     private final int padding = 10;
     private final int curveFactor = 40;
 
-    // متغیرهای مربوط به چیدمان TABLE
     private final int cardsPerRow = 4;
     private final int horizontalSpacing = 10;
     private final int verticalSpacing = 10;
 
-    // متغیرهای مربوط به drag-and-drop
     private float startX, startY;
     private float cardStartY;
     private ImageView draggedCard;
     private static final int PLAY_THRESHOLD = 200;
 
-    private float[] lastCardPosition = new float[]{0f, 0f}; // مختصات آخرین کارت برای TABLE
+    private float[] lastCardPosition = new float[]{0f, 0f};
     private List<ImageView> highlightedCards = new ArrayList<>();
 
-    // متغیر برای ذخیره اندازه کارت روی زمین
     private float tableCardWidth = 0f;
     private float tableCardHeight = 0f;
+
+    private boolean isInitialAnimationPending = false; // پرچم جدید برای انیمیشن اولیه
 
     public CardContainerView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -100,7 +99,13 @@ public class CardContainerView extends ConstraintLayout {
             cards.add(card);
             addView(cardView);
         }
-        requestLayout();
+
+        // اگر در حال انیمیشن اولیه هستیم، از چیدن کارت‌ها جلوگیری می‌کنیم
+        if (!isInitialAnimationPending) {
+            requestLayout();
+        } else {
+            Log.d("TableLayout", "Skipping layout due to pending initial animation");
+        }
     }
 
     public void setShowCards(boolean show) {
@@ -193,6 +198,14 @@ public class CardContainerView extends ConstraintLayout {
         }
     }
 
+    // متدهای جدید برای مدیریت پرچم انیمیشن اولیه
+    public void setInitialAnimationPending(boolean pending) {
+        this.isInitialAnimationPending = pending;
+        if (!pending) {
+            requestLayout(); // بعد از اتمام انیمیشن، چیدن کارت‌ها را انجام می‌دهیم
+        }
+    }
+
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         if (type == Type.HAND) {
@@ -212,16 +225,25 @@ public class CardContainerView extends ConstraintLayout {
         int screenWidth = getWidth();
         int screenHeight = getHeight();
 
+        Log.d("HandLayout", "Laying out hand with " + count + " cards");
+        Log.d("HandLayout", "Screen dimensions: width=" + screenWidth + ", height=" + screenHeight);
+        Log.d("HandLayout", "Card dimensions: width=" + cardWidth + ", height=" + cardHeightPx);
+
         int maxAllowedWidth = screenWidth - (2 * padding);
         int totalWidth = (count - 1) * overlap + cardWidth;
+
+        Log.d("HandLayout", "Calculated total width: " + totalWidth + ", max allowed width: " + maxAllowedWidth);
 
         if (totalWidth > maxAllowedWidth) {
             float reductionFactor = (float) maxAllowedWidth / totalWidth;
             totalWidth = (count - 1) * (int) (overlap * reductionFactor) + cardWidth;
+            Log.d("HandLayout", "Adjusted total width after reduction: " + totalWidth);
         }
 
         int startX = (screenWidth - totalWidth) / 2;
         int baseY = screenHeight - cardHeightPx - padding;
+
+        Log.d("HandLayout", "Starting X position: " + startX + ", base Y position: " + baseY);
 
         for (int i = 0; i < count; i++) {
             ImageView card = cardViews.get(i);
@@ -240,30 +262,44 @@ public class CardContainerView extends ConstraintLayout {
             if (card != draggedCard) {
                 card.layout(left, adjustedY, left + cardWidth, adjustedY + cardHeightPx);
                 card.setRotation(angle);
+                Log.d("HandLayout", "Card " + i + " position: x=" + left + ", y=" + adjustedY);
+                Log.d("HandLayout", "Card " + i + " size: width=" + cardWidth + ", height=" + cardHeightPx);
+                Log.d("HandLayout", "Card " + i + " rotation: " + angle);
             }
             card.setZ(i);
         }
     }
 
     private void layoutTable() {
+        // اگر انیمیشن اولیه در حال انجام است، چیدن کارت‌ها را انجام نمی‌دهیم
+        if (isInitialAnimationPending) {
+            Log.d("TableLayout", "Skipping layoutTable due to pending initial animation");
+            return;
+        }
+
         int count = cardViews.size();
         if (count == 0) {
             lastCardPosition = new float[]{0f, 0f};
             tableCardWidth = 0f;
             tableCardHeight = 0f;
+            Log.d("TableLayout", "No cards to layout on table");
             return;
         }
 
         int screenWidth = getWidth();
         int screenHeight = getHeight();
 
+        Log.d("TableLayout", "Laying out table with " + count + " cards");
+        Log.d("TableLayout", "Screen dimensions: width=" + screenWidth + ", height=" + screenHeight);
+
         int availableWidth = screenWidth - (padding * (cardsPerRow + 1));
         int cardWidth = availableWidth / cardsPerRow;
         int cardHeightPx = (int) (cardWidth * 1.5);
 
-        // ذخیره اندازه کارت‌های روی زمین
         tableCardWidth = cardWidth;
         tableCardHeight = cardHeightPx;
+
+        Log.d("TableLayout", "Calculated card dimensions: width=" + cardWidth + ", height=" + cardHeightPx);
 
         for (ImageView cardView : cardViews) {
             ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
@@ -274,6 +310,7 @@ public class CardContainerView extends ConstraintLayout {
         int requiredHeight = (rows * (cardHeightPx + verticalSpacing)) + padding;
         if (getMinimumHeight() < requiredHeight) {
             setMinimumHeight(requiredHeight);
+            Log.d("TableLayout", "Adjusted minimum height to: " + requiredHeight);
         }
 
         int startX = padding;
@@ -288,6 +325,8 @@ public class CardContainerView extends ConstraintLayout {
             card.layout(left, top, left + cardWidth, top + cardHeightPx);
             card.setZ(selectedCards.contains(cards.get(i)) ? 1 : 0);
             card.setAlpha(selectedCards.contains(cards.get(i)) ? 0.7f : 1.0f);
+            Log.d("TableLayout", "Card " + i + " position: x=" + left + ", y=" + top);
+            Log.d("TableLayout", "Card " + i + " size: width=" + cardWidth + ", height=" + cardHeightPx);
         }
 
         int nextIndex = count;
@@ -295,6 +334,7 @@ public class CardContainerView extends ConstraintLayout {
         int nextColumn = nextIndex % cardsPerRow;
         lastCardPosition[0] = startX + (nextColumn * (cardWidth + horizontalSpacing));
         lastCardPosition[1] = startY + (nextRow * (cardHeightPx + verticalSpacing));
+        Log.d("TableLayout", "Last card position: x=" + lastCardPosition[0] + ", y=" + lastCardPosition[1]);
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -312,7 +352,6 @@ public class CardContainerView extends ConstraintLayout {
                         startY = event.getRawY();
                         cardStartY = v.getY();
                         draggedCard = (ImageView) v;
-                        // افزایش elevation برای اطمینان از نمایش در بالای tableView
                         draggedCard.setElevation(15f);
                         draggedCard.bringToFront();
                         return true;
@@ -337,12 +376,10 @@ public class CardContainerView extends ConstraintLayout {
                                 float rotation = draggedCard.getRotation();
                                 cardPlayedListener.onCardPlayed(card, globalDropX, globalDropY, rotation);
                             }
-                            // بازگرداندن elevation به حالت اولیه
                             draggedCard.setElevation(0f);
                         } else {
                             draggedCard.setX(v.getLeft());
                             draggedCard.setY(cardStartY);
-                            // بازگرداندن elevation به حالت اولیه
                             draggedCard.setElevation(0f);
                             draggedCard = null;
                             requestLayout();
