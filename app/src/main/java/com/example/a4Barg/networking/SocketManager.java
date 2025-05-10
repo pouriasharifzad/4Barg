@@ -39,7 +39,7 @@ public class SocketManager {
     private static final List<PlayerCardsListener> playerCardsListeners = new ArrayList<>();
     private static final List<GamePlayersInfoListener> gamePlayersInfoListeners = new ArrayList<>();
     private static final List<TurnUpdateListener> turnUpdateListeners = new ArrayList<>();
-    private static final List<UserStatusUpdateListener> userStatusUpdateListeners = new ArrayList<>(); // New listener for user status updates
+    private static final List<UserStatusUpdateListener> userStatusUpdateListeners = new ArrayList<>();
     private static final Map<String, List<CustomListener>> customListeners = new HashMap<>();
     private static final Set<String> pendingRequests = new HashSet<>();
 
@@ -58,7 +58,6 @@ public class SocketManager {
                     Log.d("TEST", "Received avatar_status: " + data.toString());
                     Handler mainHandler = new Handler(Looper.getMainLooper());
                     mainHandler.post(() -> {
-                        // اینجا می‌تونی منطق اضافی برای پردازش رویداد اضافه کنی
                     });
                 } catch (Exception e) {
                     Log.e("TEST", "Error in avatar_status listener: " + e.getMessage());
@@ -96,7 +95,6 @@ public class SocketManager {
         turnUpdateListeners.add(listener);
     }
 
-    // Add listener for user status updates
     public static void addUserStatusUpdateListener(UserStatusUpdateListener listener) {
         userStatusUpdateListeners.add(listener);
     }
@@ -193,7 +191,6 @@ public class SocketManager {
             }
         });
 
-        // Listener for user status updates
         socket.on("user_status_update", args -> {
             try {
                 JSONObject data = (JSONObject) args[0];
@@ -348,7 +345,6 @@ public class SocketManager {
         void onEvent(JSONObject data);
     }
 
-    // New interface for user status updates
     public interface UserStatusUpdateListener {
         void onUserStatusUpdate(String userId, String status);
     }
@@ -395,7 +391,7 @@ public class SocketManager {
             return;
         }
 
-        final long TIMEOUT_MS = 10000;
+        final long TIMEOUT_MS = 15000; // افزایش تایم‌اوت به 15 ثانیه برای اطمینان بیشتر
         final Handler timeoutHandler = new Handler(Looper.getMainLooper());
         final Runnable timeoutRunnable = () -> {
             synchronized (pendingRequests) {
@@ -523,7 +519,7 @@ public class SocketManager {
 
     private static void proceedWithGameLoading(Context context, SocketRequest request, Response response, String token, String requestKey) throws JSONException {
         String event = request.getJsonObject().getString("event");
-        final long TIMEOUT_MS = 10000;
+        final long TIMEOUT_MS = 15000; // افزایش تایم‌اوت به 15 ثانیه
         final Handler timeoutHandler = new Handler(Looper.getMainLooper());
         final Runnable timeoutRunnable = () -> {
             synchronized (pendingRequests) {
@@ -646,6 +642,14 @@ public class SocketManager {
                             ConsValue.socketRequestList.remove(request);
                         }
                     }
+                } else if (event.equals("refresh_token_response")) {
+                    if (success) {
+                        isRequestCompleted = true;
+                        request.getResponse().onResponse(object, false);
+                        ConsValue.socketRequestList.remove(request);
+                    } else {
+                        request.getResponse().onError(new IllegalArgumentException(object.has("message") ? object.getString("message") : "Unknown error"));
+                    }
                 } else {
                     Log.e("SocketManager", "Unhandled response event: " + event);
                     request.getResponse().onError(new IllegalArgumentException("رویداد ناشناخته: " + event));
@@ -714,6 +718,28 @@ public class SocketManager {
                 return;
             }
             pendingRequests.add(requestKey);
+        }
+
+        if (!requestData.has("token")) {
+            try {
+                SharedPreferences prefs = context.getSharedPreferences("auth", Context.MODE_PRIVATE);
+                String token = prefs.getString("token", null);
+                if (token != null) {
+                    requestData.put("token", token);
+                } else {
+                    response.onError(new IllegalArgumentException("توکن موجود نیست"));
+                    synchronized (pendingRequests) {
+                        pendingRequests.remove(requestKey);
+                    }
+                    return;
+                }
+            } catch (JSONException e) {
+                response.onError(e);
+                synchronized (pendingRequests) {
+                    pendingRequests.remove(requestKey);
+                }
+                return;
+            }
         }
 
         socket.emit("refresh_token", requestData);
