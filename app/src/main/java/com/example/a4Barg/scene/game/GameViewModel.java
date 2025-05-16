@@ -54,6 +54,8 @@ public class GameViewModel extends AndroidViewModel {
     private GameActivity activity;
     private boolean isAnimating = false;
     private List<Card> pendingTableCardsUpdate = null;
+    private final List<JSONObject> pendingPlayedCardEvents = new ArrayList<>();
+    private final List<JSONObject> pendingGameStateUpdates = new ArrayList<>();
 
     public GameViewModel(Application application) {
         super(application);
@@ -157,100 +159,11 @@ public class GameViewModel extends AndroidViewModel {
         SocketManager.listenForGameStateUpdates(new SocketManager.GameStateUpdateListener() {
             @Override
             public void onGameStateUpdate(JSONObject data) {
-                try {
-                    if (data.has("players")) {
-                        JSONArray players = data.getJSONArray("players");
-                        for (int i = 0; i < players.length(); i++) {
-                            JSONObject player = players.getJSONObject(i);
-                            String playerId = player.getString("userId");
-                            if (!playerId.equals(userId)) {
-                                opponentCardCount.setValue(player.getInt("cardCount"));
-                            }
-                        }
-                    }
-                    if (data.has("gameOver") && data.getBoolean("gameOver")) {
-                        opponentCardCount.setValue(0);
-                        if (!data.has("tableCards")) {
-                            tableCards.setValue(new ArrayList<>());
-                        }
-                        gameOver.setValue(true);
-                        if (data.has("scores") && data.has("winner")) {
-                            JSONArray scores = data.getJSONArray("scores");
-                            int userScoreValue = 0, opponentScoreValue = 0;
-                            for (int i = 0; i < scores.length(); i++) {
-                                JSONObject scoreObj = scores.getJSONObject(i);
-                                String playerId = scoreObj.getString("userId");
-                                int score = scoreObj.getInt("score");
-                                if (playerId.equals(userId)) {
-                                    userScore.setValue(score);
-                                    userScoreValue = score;
-                                } else {
-                                    opponentScore.setValue(score);
-                                    opponentScoreValue = score;
-                                }
-                            }
-                            String winnerId = data.getString("winner");
-                            winner.setValue(winnerId);
-                            String winnerMessage = winnerId.equals(userId) ? "شما برنده شدید!" : "حریف شما برنده شد!";
-                            String resultText = String.format(
-                                    "بازی تموم شد!\nامتیاز شما: %d\nامتیاز حریف: %d\n%s",
-                                    userScoreValue, opponentScoreValue, winnerMessage
-                            );
-                            gameResultText.setValue(resultText);
-                        }
-                    }
-                    if (data.has("tableCards")) {
-                        JSONArray tableCardsArray = data.getJSONArray("tableCards");
-                        List<Card> cards = new ArrayList<>();
-                        for (int i = 0; i < tableCardsArray.length(); i++) {
-                            JSONObject cardObj = tableCardsArray.getJSONObject(i);
-                            cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
-                        }
-                        if (isAnimating) {
-                            pendingTableCardsUpdate = cards;
-                        } else {
-                            Log.d("TableCards", "Received table cards from game state: " + cards.size() + " cards");
-                            tableCards.setValue(cards);
-                        }
-                    }
-                    if (data.has("currentTurn")) {
-                        currentTurn.setValue(data.getString("currentTurn"));
-                    }
-                    if (data.has("collectedCards")) {
-                        JSONArray collected = data.getJSONArray("collectedCards");
-                        for (int i = 0; i < collected.length(); i++) {
-                            JSONObject player = collected.getJSONObject(i);
-                            String playerId = player.getString("userId");
-                            JSONArray cardsArray = player.getJSONArray("cards");
-                            List<Card> cards = new ArrayList<>();
-                            for (int j = 0; j < cardsArray.length(); j++) {
-                                JSONObject cardObj = cardsArray.getJSONObject(j);
-                                cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
-                            }
-                            if (playerId.equals(userId)) {
-                                userCollectedCards.setValue(cards);
-                            } else {
-                                opponentCollectedCards.setValue(cards);
-                            }
-                        }
-                    }
-                    if (data.has("surs")) {
-                        JSONArray surs = data.getJSONArray("surs");
-                        for (int i = 0; i < surs.length(); i++) {
-                            JSONObject surObj = surs.getJSONObject(i);
-                            String playerId = surObj.getString("userId");
-                            int surCount = surObj.getInt("count");
-                            if (playerId.equals(userId)) {
-                                userSurs.setValue(surCount);
-                            } else {
-                                opponentSurs.setValue(surCount);
-                            }
-                        }
-                    }
-                    if (data.has("surEvent") && data.getBoolean("surEvent")) {
-                        activity.runOnUiThread(() -> Log.d("GameViewModel", "Sur event triggered!"));
-                    }
-                } catch (JSONException e) {
+                if (isAnimating) {
+                    pendingGameStateUpdates.add(data);
+                    Log.d("GameViewModel", "Stored game_state_update event, pending animation completion");
+                } else {
+                    processGameStateUpdate(data);
                 }
             }
 
@@ -382,91 +295,188 @@ public class GameViewModel extends AndroidViewModel {
         SocketManager.addCustomListener("played_card", new SocketManager.CustomListener() {
             @Override
             public void onEvent(JSONObject data) {
-                try {
-                    String playerId = data.getString("userId");
-                    JSONObject cardObj = data.getJSONObject("card");
-                    String suit = cardObj.getString("suit");
-                    String value = cardObj.getString("value");
-                    Card playedCard = new Card(suit, value);
-                    boolean isUser = playerId.equals(userId);
-                    boolean isCollected = data.optBoolean("isCollected", false);
-                    List<Card> tableCardsToCollect = new ArrayList<>();
-                    if (data.has("tableCards")) {
-                        JSONArray tableCardsArray = data.getJSONArray("tableCards");
-                        tableCardsToCollect = parseCards(tableCardsArray);
-                        Log.d("TableCards", "Received tableCardsToCollect from server: " + tableCardsToCollect.size() + " cards - " + tableCardsToCollect.toString());
-                    } else {
-                        Log.w("GameViewModel", "No tableCards found in played_card event, assuming empty");
-                    }
+                pendingPlayedCardEvents.add(data);
+                Log.d("GameViewModel", "Stored played_card event, pending animation completion");
+                activity.runOnUiThread(() -> {
+                    try {
+                        String playerId = data.getString("userId");
+                        JSONObject cardObj = data.getJSONObject("card");
+                        String suit = cardObj.getString("suit");
+                        String value = cardObj.getString("value");
+                        Card playedCard = new Card(suit, value);
+                        boolean isUser = playerId.equals(userId);
+                        boolean isCollected = data.optBoolean("isCollected", false);
+                        List<Card> tableCardsToCollect = new ArrayList<>();
+                        if (data.has("tableCards")) {
+                            JSONArray tableCardsArray = data.getJSONArray("tableCards");
+                            tableCardsToCollect = parseCards(tableCardsArray);
+                        }
 
-                    if (isCollected) {
-                        Log.d("GameViewModel", String.format("Card %s of %s collected by %s", value, suit, isUser ? "user" : "opponent"));
                         isAnimating = true;
-                        List<Card> finalTableCardsToCollect = tableCardsToCollect;
-                        List<Card> finalTableCardsToCollect1 = tableCardsToCollect;
-                        activity.runOnUiThread(() -> {
-                            float startX, startY, startRotation;
-                            if (isUser) {
-                                startX = lastDropX;
-                                startY = lastDropY;
-                                startRotation = lastDropRotation;
-                                activity.getUserHandView().removeCardFromHand(playedCard);
-                            } else {
-                                startX = activity.getOpponentHandView().getX() + (activity.getOpponentHandView().getWidth() / 2f);
-                                startY = activity.getOpponentHandView().getY() + (activity.getOpponentHandView().getHeight() / 2f);
-                                startRotation = 0f;
-                            }
-                            activity.animateCard(playedCard, isUser, startX, startY, startRotation, finalTableCardsToCollect, () -> {
-                                isAnimating = false;
-                                List<Card> currentTableCards = tableCards.getValue();
-                                if (currentTableCards != null) {
-                                    List<Card> updatedTableCards = new ArrayList<>(currentTableCards);
-                                    updatedTableCards.removeAll(finalTableCardsToCollect1);
-                                    updatedTableCards.remove(playedCard);
-                                    tableCards.setValue(updatedTableCards);
-                                    Log.d("TableCards", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
-                                }
-                                if (pendingTableCardsUpdate != null) {
-                                    Log.d("TableCards", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
-                                    tableCards.setValue(pendingTableCardsUpdate);
-                                    pendingTableCardsUpdate = null;
-                                }
-                            });
+                        float startX, startY, startRotation;
+                        if (isUser) {
+                            startX = lastDropX;
+                            startY = lastDropY;
+                            startRotation = lastDropRotation;
+                            activity.getUserHandView().removeCardFromHand(playedCard);
+                        } else {
+                            startX = activity.getOpponentHandView().getX() + (activity.getOpponentHandView().getWidth() / 2f);
+                            startY = activity.getOpponentHandView().getY() + (activity.getOpponentHandView().getHeight() / 2f);
+                            startRotation = 0f;
+                        }
+                        activity.animateCard(playedCard, isUser, startX, startY, startRotation, tableCardsToCollect, () -> {
+                            isAnimating = false;
+                            processPendingEvents();
                         });
-                    } else {
-                        isAnimating = true;
-                        float[] lastCardPosition = activity.getTableView().getLastCardPosition();
-                        float endX = lastCardPosition[0];
-                        float endY = lastCardPosition[1];
-                        Log.d("TableCards", String.format("Card %s of %s played by %s to position (%.2f, %.2f)", value, suit, isUser ? "user" : "opponent", endX, endY));
-                        List<Card> finalTableCardsToCollect2 = tableCardsToCollect;
-                        activity.runOnUiThread(() -> {
-                            float startX, startY, startRotation;
-                            if (isUser) {
-                                startX = lastDropX;
-                                startY = lastDropY;
-                                startRotation = lastDropRotation;
-                                activity.getUserHandView().removeCardFromHand(playedCard);
-                            } else {
-                                startX = activity.getOpponentHandView().getX() + (activity.getOpponentHandView().getWidth() / 2f);
-                                startY = activity.getOpponentHandView().getY() + (activity.getOpponentHandView().getHeight() / 2f);
-                                startRotation = 0f;
-                            }
-                            activity.animateCard(playedCard, isUser, startX, startY, startRotation, finalTableCardsToCollect2, () -> {
-                                isAnimating = false;
-                                if (pendingTableCardsUpdate != null) {
-                                    Log.d("TableCards", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
-                                    tableCards.setValue(pendingTableCardsUpdate);
-                                    pendingTableCardsUpdate = null;
-                                }
-                            });
-                        });
+                    } catch (JSONException e) {
+                        Log.e("GameViewModel", "Error initiating played_card animation: " + e.getMessage());
+                        isAnimating = false;
                     }
-                } catch (JSONException e) {
-                    Log.e("GameViewModel", "Error parsing played_card event: " + e.getMessage());
-                }
+                });
             }
         });
+    }
+
+    private void processPendingEvents() {
+        // پردازش رویدادهای played_card
+        for (JSONObject data : new ArrayList<>(pendingPlayedCardEvents)) {
+            try {
+                String playerId = data.getString("userId");
+                JSONObject cardObj = data.getJSONObject("card");
+                String suit = cardObj.getString("suit");
+                String value = cardObj.getString("value");
+                Card playedCard = new Card(suit, value);
+                boolean isCollected = data.optBoolean("isCollected", false);
+                List<Card> tableCardsToCollect = new ArrayList<>();
+                if (data.has("tableCards")) {
+                    JSONArray tableCardsArray = data.getJSONArray("tableCards");
+                    tableCardsToCollect = parseCards(tableCardsArray);
+                }
+
+                if (isCollected) {
+                    List<Card> currentTableCards = tableCards.getValue();
+                    if (currentTableCards != null) {
+                        List<Card> updatedTableCards = new ArrayList<>(currentTableCards);
+                        updatedTableCards.removeAll(tableCardsToCollect);
+                        updatedTableCards.remove(playedCard);
+                        tableCards.setValue(updatedTableCards);
+                        Log.d("TableCards", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
+                    }
+                }
+                if (pendingTableCardsUpdate != null) {
+                    Log.d("TableCards", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
+                    tableCards.setValue(pendingTableCardsUpdate);
+                    pendingTableCardsUpdate = null;
+                }
+            } catch (JSONException e) {
+                Log.e("GameViewModel", "Error processing stored played_card event: " + e.getMessage());
+            }
+        }
+        pendingPlayedCardEvents.clear();
+
+        // پردازش رویدادهای game_state_update
+        for (JSONObject data : new ArrayList<>(pendingGameStateUpdates)) {
+            processGameStateUpdate(data);
+        }
+        pendingGameStateUpdates.clear();
+    }
+
+    private void processGameStateUpdate(JSONObject data) {
+        try {
+            if (data.has("players")) {
+                JSONArray players = data.getJSONArray("players");
+                for (int i = 0; i < players.length(); i++) {
+                    JSONObject player = players.getJSONObject(i);
+                    String playerId = player.getString("userId");
+                    if (!playerId.equals(userId)) {
+                        opponentCardCount.setValue(player.getInt("cardCount"));
+                    }
+                }
+            }
+            if (data.has("gameOver") && data.getBoolean("gameOver")) {
+                opponentCardCount.setValue(0);
+                if (!data.has("tableCards")) {
+                    tableCards.setValue(new ArrayList<>());
+                }
+                gameOver.setValue(true);
+                if (data.has("scores") && data.has("winner")) {
+                    JSONArray scores = data.getJSONArray("scores");
+                    int userScoreValue = 0, opponentScoreValue = 0;
+                    for (int i = 0; i < scores.length(); i++) {
+                        JSONObject scoreObj = scores.getJSONObject(i);
+                        String playerId = scoreObj.getString("userId");
+                        int score = scoreObj.getInt("score");
+                        if (playerId.equals(userId)) {
+                            userScore.setValue(score);
+                            userScoreValue = score;
+                        } else {
+                            opponentScore.setValue(score);
+                            opponentScoreValue = score;
+                        }
+                    }
+                    String winnerId = data.getString("winner");
+                    winner.setValue(winnerId);
+                    String winnerMessage = winnerId.equals(userId) ? "شما برنده شدید!" : "حریف شما برنده شد!";
+                    String resultText = String.format(
+                            "بازی تموم شد!\nامتیاز شما: %d\nامتیاز حریف: %d\n%s",
+                            userScoreValue, opponentScoreValue, winnerMessage
+                    );
+                    gameResultText.setValue(resultText);
+                }
+            }
+            if (data.has("tableCards")) {
+                JSONArray tableCardsArray = data.getJSONArray("tableCards");
+                List<Card> cards = new ArrayList<>();
+                for (int i = 0; i < tableCardsArray.length(); i++) {
+                    JSONObject cardObj = tableCardsArray.getJSONObject(i);
+                    cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
+                }
+                if (isAnimating) {
+                    pendingTableCardsUpdate = cards;
+                } else {
+                    Log.d("TableCards", "Received table cards from game state: " + cards.size() + " cards");
+                    tableCards.setValue(cards);
+                }
+            }
+            if (data.has("currentTurn")) {
+                currentTurn.setValue(data.getString("currentTurn"));
+            }
+            if (data.has("collectedCards")) {
+                JSONArray collected = data.getJSONArray("collectedCards");
+                for (int i = 0; i < collected.length(); i++) {
+                    JSONObject player = collected.getJSONObject(i);
+                    String playerId = player.getString("userId");
+                    JSONArray cardsArray = player.getJSONArray("cards");
+                    List<Card> cards = new ArrayList<>();
+                    for (int j = 0; j < cardsArray.length(); j++) {
+                        JSONObject cardObj = cardsArray.getJSONObject(j);
+                        cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
+                    }
+                    if (playerId.equals(userId)) {
+                        userCollectedCards.setValue(cards);
+                    } else {
+                        opponentCollectedCards.setValue(cards);
+                    }
+                }
+            }
+            if (data.has("surs")) {
+                JSONArray surs = data.getJSONArray("surs");
+                for (int i = 0; i < surs.length(); i++) {
+                    JSONObject surObj = surs.getJSONObject(i);
+                    String playerId = surObj.getString("userId");
+                    int surCount = surObj.getInt("count");
+                    if (playerId.equals(userId)) {
+                        userSurs.setValue(surCount);
+                    } else {
+                        opponentSurs.setValue(surCount);
+                    }
+                }
+            }
+            if (data.has("surEvent") && data.getBoolean("surEvent")) {
+                activity.runOnUiThread(() -> Log.d("GameViewModel", "Sur event triggered!"));
+            }
+        } catch (JSONException e) {
+        }
     }
 
     private List<Card> parseCards(JSONArray cardsArray) throws JSONException {

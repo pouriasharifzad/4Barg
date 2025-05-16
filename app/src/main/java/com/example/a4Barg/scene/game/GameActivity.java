@@ -440,12 +440,10 @@ public class GameActivity extends BaseActivity {
         if (tableCards == null || tableCards.isEmpty()) {
             Log.d("TableCards", "No cards to display on table");
             tableView.setCards(new ArrayList<>());
-            // isInitialTableCardsSet را بازنشانی نمی‌کنیم تا انیمیشن اولیه دوباره اجرا نشود
             return;
         }
         Log.d("TableCards", "Cards to display: " + tableCards.toString());
 
-        // فقط در ابتدای بازی (وقتی دست کاربر 4 کارت دارد) انیمیشن اولیه اجرا شود
         List<Card> userCards = viewModel.getUserCards().getValue();
         boolean isGameStart = userCards != null && userCards.size() == 4 && !isInitialTableCardsSet;
         if (tableCards.size() == 4 && isGameStart) {
@@ -614,7 +612,7 @@ public class GameActivity extends BaseActivity {
     }
 
     private void animateInitialUserHandCards(List<Card> initialCards) {
-        if (initialCards.size() != 4) {
+        if ( initialCards.size() != 4) {
             Log.w("HandCards", "animateInitialUserHandCards called with incorrect number of cards: " + initialCards.size());
             return;
         }
