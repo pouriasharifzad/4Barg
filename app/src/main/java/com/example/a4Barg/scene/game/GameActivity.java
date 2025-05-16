@@ -60,6 +60,8 @@ public class GameActivity extends AppCompatActivity {
 
     private Map<ImageView, ObjectAnimator> selectedBlinkingAnimators = new HashMap<>();
     private boolean isInitialTableCardsSet = false;
+    private boolean isInitialUserHandSet = false;
+    private boolean isTableAnimationComplete = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -399,19 +401,29 @@ public class GameActivity extends AppCompatActivity {
             return;
         }
         Log.d("HandCards", "Cards to display: " + cards.toString());
-        userHandView.setCards(cards);
-        Log.d("HandCards", "Cards laid out in userHandView");
-        userHandView.post(() -> {
-            int count = userHandView.getCards().size();
-            if (count > 0) {
-                for (int i = 0; i < count; i++) {
-                    ImageView cardView = (ImageView) userHandView.getChildAt(i);
-                    Log.d("HandCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
-                    Log.d("HandCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
-                    Log.d("HandCards", "Card " + i + " rotation: " + cardView.getRotation());
-                }
+        if (cards.size() == 4 && userHandView.getCards().isEmpty() && !isInitialUserHandSet) {
+            userHandView.setInitialAnimationPending(true);
+            if (isTableAnimationComplete) {
+                animateInitialUserHandCards(cards);
+                isInitialUserHandSet = true;
+            } else {
+                Log.d("HandCards", "Waiting for table animation to complete before user hand animation");
             }
-        });
+        } else {
+            userHandView.setCards(cards);
+            Log.d("HandCards", "Cards laid out in userHandView");
+            userHandView.post(() -> {
+                int count = userHandView.getCards().size();
+                if (count > 0) {
+                    for (int i = 0; i < count; i++) {
+                        ImageView cardView = (ImageView) userHandView.getChildAt(i);
+                        Log.d("HandCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                        Log.d("HandCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                        Log.d("HandCards", "Card " + i + " rotation: " + cardView.getRotation());
+                    }
+                }
+            });
+        }
     }
 
     private void updateOpponentHand(Integer cardCount) {
@@ -519,8 +531,8 @@ public class GameActivity extends AppCompatActivity {
 
             cardView.setX(startX);
             cardView.setY(startY);
-            cardView.setScaleX(0f); // اندازه اولیه صفر
-            cardView.setScaleY(0f); // اندازه اولیه صفر
+            cardView.setScaleX(0f);
+            cardView.setScaleY(0f);
             cardView.setRotation(0f);
 
             rootLayout.addView(cardView);
@@ -539,12 +551,12 @@ public class GameActivity extends AppCompatActivity {
 
             ObjectAnimator moveX = ObjectAnimator.ofFloat(cardView, "x", startX, targetX);
             ObjectAnimator moveY = ObjectAnimator.ofFloat(cardView, "y", startY, targetY);
-            ObjectAnimator scaleX = ObjectAnimator.ofFloat(cardView, "scaleX", 0f, 1f); // انیمیشن مقیاس از ۰ به ۱
-            ObjectAnimator scaleY = ObjectAnimator.ofFloat(cardView, "scaleY", 0f, 1f); // انیمیشن مقیاس از ۰ به ۱
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(cardView, "scaleX", 0f, 1f);
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(cardView, "scaleY", 0f, 1f);
 
             AnimatorSet cardAnimator = new AnimatorSet();
-            cardAnimator.playTogether(moveX, moveY, scaleX, scaleY); // اضافه کردن انیمیشن مقیاس
-            cardAnimator.setDuration(1000);
+            cardAnimator.playTogether(moveX, moveY, scaleX, scaleY);
+            cardAnimator.setDuration(500);
             cardAnimators.add(cardAnimator);
 
             Log.d("TableCards", "Created animation for card " + i + " to position: x=" + targetX + ", y=" + targetY + " with scale from (0,0) to (1,1)");
@@ -554,7 +566,7 @@ public class GameActivity extends AppCompatActivity {
             if (i == 0) {
                 fullAnimatorSet.play(cardAnimators.get(i));
             } else {
-                fullAnimatorSet.play(cardAnimators.get(i)).after(cardAnimators.get(i - 1)).after(500);
+                fullAnimatorSet.play(cardAnimators.get(i)).after(cardAnimators.get(i - 1)).after(250);
             }
         }
 
@@ -564,6 +576,7 @@ public class GameActivity extends AppCompatActivity {
                 Log.d("TableCards", "Initial cards animation completed");
                 tableView.setCards(initialCards);
                 Log.d("TableCards", "Cards laid out in tableView after animation");
+                isTableAnimationComplete = true;
 
                 for (ImageView cardView : animatedCards) {
                     rootLayout.removeView(cardView);
@@ -582,11 +595,128 @@ public class GameActivity extends AppCompatActivity {
                         }
                     }
                 });
+
+                List<Card> userCards = viewModel.getUserCards().getValue();
+                if (userCards != null && userCards.size() == 4 && userHandView.getCards().isEmpty() && !isInitialUserHandSet) {
+                    userHandView.setInitialAnimationPending(true);
+                    animateInitialUserHandCards(userCards);
+                    isInitialUserHandSet = true;
+                }
             }
         });
 
         fullAnimatorSet.start();
         Log.d("TableCards", "Started animation for initial 4 cards");
+    }
+
+    private void animateInitialUserHandCards(List<Card> initialCards) {
+        if (initialCards.size() != 4) {
+            Log.w("HandCards", "animateInitialUserHandCards called with incorrect number of cards: " + initialCards.size());
+            return;
+        }
+
+        int screenWidth = userHandView.getWidth();
+        int screenHeight = userHandView.getHeight();
+        Log.d("HandCards", "UserHandView dimensions: width=" + screenWidth + ", height=" + screenHeight);
+
+        float cardWidth = 315;
+        float cardHeight = 362;
+        float aspectRatio = cardWidth / cardHeight;
+
+        float startX = screenWidth;
+        float startY = screenHeight / 2f - cardHeight / 2f;
+        Log.d("HandCards", "Animation start position: x=" + startX + ", y=" + startY);
+
+        float[] targetXs = new float[]{178, 278, 378, 478};
+        float[] targetYs = new float[]{1402, 1367, 1367, 1402};
+        float[] targetRotations = new float[]{-14, -7, 0, 7};
+
+        userHandView.setCards(new ArrayList<>());
+
+        List<ImageView> animatedCards = new ArrayList<>();
+        for (int i = 0; i < initialCards.size(); i++) {
+            Card card = initialCards.get(i);
+            ImageView cardView = createAnimatedCard(card);
+
+            ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) cardView.getLayoutParams();
+            params.width = (int) cardWidth;
+            params.height = (int) cardHeight;
+            cardView.setLayoutParams(params);
+            Log.d("HandCards", "Card " + i + " initial size: width=" + cardWidth + ", height=" + cardHeight);
+
+            cardView.setX(startX);
+            cardView.setY(startY);
+            cardView.setScaleX(0f);
+            cardView.setScaleY(0f);
+            cardView.setRotation(0f);
+
+            rootLayout.addView(cardView);
+            animatedCards.add(cardView);
+            Log.d("HandCards", "Added card " + i + " to rootLayout at position: x=" + startX + ", y=" + startY + " with initial scale: (0, 0)");
+        }
+
+        AnimatorSet fullAnimatorSet = new AnimatorSet();
+        List<Animator> cardAnimators = new ArrayList<>();
+
+        for (int i = 0; i < animatedCards.size(); i++) {
+            ImageView cardView = animatedCards.get(i);
+            float targetX = userHandView.getX() + targetXs[i];
+            float targetY = userHandView.getY() + targetYs[i];
+            float targetRotation = targetRotations[i];
+            Log.d("HandCards", "Card " + i + " target position: x=" + targetX + ", y=" + targetY + ", rotation=" + targetRotation);
+
+            ObjectAnimator moveX = ObjectAnimator.ofFloat(cardView, "x", startX, targetX);
+            ObjectAnimator moveY = ObjectAnimator.ofFloat(cardView, "y", startY, targetY);
+            ObjectAnimator rotate = ObjectAnimator.ofFloat(cardView, "rotation", 0f, targetRotation);
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(cardView, "scaleX", 0f, 1f);
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(cardView, "scaleY", 0f, 1f);
+
+            AnimatorSet cardAnimator = new AnimatorSet();
+            cardAnimator.playTogether(moveX, moveY, rotate, scaleX, scaleY);
+            cardAnimator.setDuration(250);
+            cardAnimators.add(cardAnimator);
+
+            Log.d("HandCards", "Created animation for card " + i + " to position: x=" + targetX + ", y=" + targetY + ", rotation=" + targetRotation + " with scale from (0,0) to (1,1)");
+        }
+
+        for (int i = 0; i < cardAnimators.size(); i++) {
+            if (i == 0) {
+                fullAnimatorSet.play(cardAnimators.get(i));
+            } else {
+                fullAnimatorSet.play(cardAnimators.get(i)).after(cardAnimators.get(i - 1)).after(125);
+            }
+        }
+
+        fullAnimatorSet.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                Log.d("HandCards", "Initial cards animation completed");
+                userHandView.setCards(initialCards);
+                Log.d("HandCards", "Cards laid out in userHandView after animation");
+
+                for (ImageView cardView : animatedCards) {
+                    rootLayout.removeView(cardView);
+                    Log.d("HandCards", "Removed animated card from rootLayout");
+                }
+
+                userHandView.setInitialAnimationPending(false);
+
+                userHandView.post(() -> {
+                    int count = userHandView.getCards().size();
+                    if (count > 0) {
+                        for (int i = 0; i < count; i++) {
+                            ImageView cardView = (ImageView) userHandView.getChildAt(i);
+                            Log.d("HandCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                            Log.d("HandCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                            Log.d("HandCards", "Card " + i + " rotation: " + cardView.getRotation());
+                        }
+                    }
+                });
+            }
+        });
+
+        fullAnimatorSet.start();
+        Log.d("HandCards", "Started animation for initial 4 cards");
     }
 
     private void updateUserCollectedCards(List<Card> cards) {
