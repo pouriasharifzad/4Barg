@@ -25,6 +25,7 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.a4Barg.R;
+import com.example.a4Barg.common.BaseActivity;
 import com.example.a4Barg.model.Card;
 import com.example.a4Barg.model.InGameMessage;
 import com.example.a4Barg.networking.SocketManager;
@@ -36,7 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class GameActivity extends AppCompatActivity {
+public class GameActivity extends BaseActivity {
 
     private GameViewModel viewModel;
     private CardContainerView userHandView;
@@ -439,12 +440,15 @@ public class GameActivity extends AppCompatActivity {
         if (tableCards == null || tableCards.isEmpty()) {
             Log.d("TableCards", "No cards to display on table");
             tableView.setCards(new ArrayList<>());
-            isInitialTableCardsSet = false;
+            // isInitialTableCardsSet را بازنشانی نمی‌کنیم تا انیمیشن اولیه دوباره اجرا نشود
             return;
         }
         Log.d("TableCards", "Cards to display: " + tableCards.toString());
 
-        if (tableCards.size() == 4 && !isInitialTableCardsSet) {
+        // فقط در ابتدای بازی (وقتی دست کاربر 4 کارت دارد) انیمیشن اولیه اجرا شود
+        List<Card> userCards = viewModel.getUserCards().getValue();
+        boolean isGameStart = userCards != null && userCards.size() == 4 && !isInitialTableCardsSet;
+        if (tableCards.size() == 4 && isGameStart) {
             tableView.setInitialAnimationPending(true);
             animateInitialTableCards(tableCards);
             isInitialTableCardsSet = true;
@@ -759,12 +763,30 @@ public class GameActivity extends AppCompatActivity {
         float[] tableCardSize = tableView.getTableCardSize();
         float targetWidth = tableCardSize[0];
         float targetHeight = tableCardSize[1];
+
+        // بررسی مقادیر نامعتبر و استفاده از مقادیر پیش‌فرض
+        if (targetWidth <= 0 || targetHeight <= 0 || Float.isNaN(targetWidth) || Float.isNaN(targetHeight)) {
+            Log.w("animation", "Invalid table card size, using default values: width=240, height=360");
+            targetWidth = 240f;
+            targetHeight = 360f;
+        }
         Log.d("dimen", "Table card size: width=" + targetWidth + ", height=" + targetHeight);
 
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
         float tableAspectRatio = targetWidth / targetHeight;
+        // بررسی tableAspectRatio برای جلوگیری از NaN
+        if (Float.isNaN(tableAspectRatio) || tableAspectRatio <= 0) {
+            Log.w("animation", "Invalid tableAspectRatio, using default value: 0.6667");
+            tableAspectRatio = 0.6667f; // نسبت عرض به ارتفاع پیش‌فرض (240/360)
+        }
+
         float handCardHeight = (int) (138 * displayMetrics.density);
         float handCardWidth = handCardHeight * tableAspectRatio;
+        // بررسی handCardWidth برای جلوگیری از NaN
+        if (Float.isNaN(handCardWidth) || handCardWidth <= 0) {
+            Log.w("animation", "Invalid handCardWidth, using default value: 240");
+            handCardWidth = 240f;
+        }
 
         if (tableCardsToCollect == null || tableCardsToCollect.isEmpty()) {
             Log.d("animation", "No cards to collect, animating directly to table.");
@@ -778,17 +800,27 @@ public class GameActivity extends AppCompatActivity {
             animatedCard.setScaleX(1f);
             animatedCard.setScaleY(1f);
 
+            float finalTargetWidth = targetWidth;
+            float finalHandCardWidth = handCardWidth;
+            float finalTargetHeight = targetHeight;
             tableView.post(() -> {
                 float[] lastCardPosition = tableView.getLastCardPosition();
                 float endX = tableView.getX() + lastCardPosition[0];
                 float endY = tableView.getY() + lastCardPosition[1];
                 Log.d("animation", "Destination Position - Title: Table (Last Card Position), Coordinates: (" + endX + ", " + endY + ")");
 
-                float scaleX = targetWidth / handCardWidth;
-                float scaleY = targetHeight / handCardHeight;
-                float finalWidth = handCardWidth * scaleX;
+                float scaleX = finalTargetWidth / finalHandCardWidth;
+                float scaleY = finalTargetHeight / handCardHeight;
+                float finalWidth = finalHandCardWidth * scaleX;
                 float finalHeight = handCardHeight * scaleY;
                 Log.d("dimen", "Played card final size (on table): width=" + finalWidth + ", height=" + finalHeight);
+
+                // بررسی مقادیر NaN یا نامعتبر برای scaleX و scaleY
+                if (Float.isNaN(scaleX) || Float.isNaN(scaleY) || scaleX <= 0 || scaleY <= 0) {
+                    Log.w("animation", "Invalid scale values, using default scale: 1.0");
+                    scaleX = 1.0f;
+                    scaleY = 1.0f;
+                }
 
                 ObjectAnimator moveX = ObjectAnimator.ofFloat(animatedCard, "x", startX, endX);
                 ObjectAnimator moveY = ObjectAnimator.ofFloat(animatedCard, "y", startY, endY);
@@ -858,6 +890,13 @@ public class GameActivity extends AppCompatActivity {
             float finalHeight = handCardHeight * finalScaleY;
             Log.d("dimen", "Played card final size (in collected cards): width=" + finalWidth + ", height=" + finalHeight);
 
+            // بررسی مقادیر NaN یا نامعتبر برای finalScaleX و finalScaleY
+            if (Float.isNaN(finalScaleX) || Float.isNaN(finalScaleY) || finalScaleX <= 0 || finalScaleY <= 0) {
+                Log.w("animation", "Invalid final scale values, using default scale: 1.0");
+                finalScaleX = 1.0f;
+                finalScaleY = 1.0f;
+            }
+
             for (int i = 0; i < tableCardViews.size(); i++) {
                 ImageView tableCardView = tableCardViews.get(i);
                 Card tableCard = tableCardsToCollect.get(i);
@@ -886,6 +925,12 @@ public class GameActivity extends AppCompatActivity {
                     if (cardView == playedCardView) {
                         float scaleX = targetWidth / handCardWidth;
                         float scaleY = targetHeight / handCardHeight;
+                        // بررسی مقادیر NaN یا نامعتبر
+                        if (Float.isNaN(scaleX) || Float.isNaN(scaleY) || scaleX <= 0 || scaleY <= 0) {
+                            Log.w("animation", "Invalid scale values for played card, using default scale: 1.0");
+                            scaleX = 1.0f;
+                            scaleY = 1.0f;
+                        }
                         stageAnimators.add(ObjectAnimator.ofFloat(cardView, "scaleX", cardView.getScaleX(), scaleX));
                         stageAnimators.add(ObjectAnimator.ofFloat(cardView, "scaleY", cardView.getScaleY(), scaleY));
                         Log.d("animation", "Scaling played card " + cardName + " to table size: (" + scaleX + ", " + scaleY + ")");
@@ -900,6 +945,9 @@ public class GameActivity extends AppCompatActivity {
 
                 int finalI = i;
                 float finalOverlapX = overlapX;
+                float finalTargetHeight1 = targetHeight;
+                float finalTargetWidth1 = targetWidth;
+                float finalHandCardWidth1 = handCardWidth;
                 stageAnimator.addListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator animation) {
@@ -910,8 +958,14 @@ public class GameActivity extends AppCompatActivity {
                         rootLayout.addView(tableCardView);
                         tableCardView.setX(finalOverlapX);
                         tableCardView.setY(overlapY);
-                        float scaleX = targetWidth / handCardWidth;
-                        float scaleY = targetHeight / handCardHeight;
+                        float scaleX = finalTargetWidth1 / finalHandCardWidth1;
+                        float scaleY = finalTargetHeight1 / handCardHeight;
+                        // بررسی مقادیر NaN یا نامعتبر
+                        if (Float.isNaN(scaleX) || Float.isNaN(scaleY) || scaleX <= 0 || scaleY <= 0) {
+                            Log.w("animation", "Invalid scale values for table card, using default scale: 1.0");
+                            scaleX = 1.0f;
+                            scaleY = 1.0f;
+                        }
                         tableCardView.setScaleX(scaleX);
                         tableCardView.setScaleY(scaleY);
                         collectedCardViews.add(tableCardView);
@@ -1003,15 +1057,18 @@ public class GameActivity extends AppCompatActivity {
         int resId = getResources().getIdentifier(card.getImageResourceName(), "drawable", getPackageName());
         animatedCard.setImageResource(resId != 0 ? resId : R.drawable.card_back);
 
-        float[] tableCardSize = tableView.getTableCardSize();
-        float targetWidth = tableCardSize[0];
-        float targetHeight = tableCardSize[1];
-
-        float tableAspectRatio = targetWidth / targetHeight;
-
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        int cardHeightPx = (int) (138 * displayMetrics.density);
-        int cardWidth = (int) (cardHeightPx * tableAspectRatio);
+        // استفاده از ابعاد سازگار با CardContainerView.layoutTable
+        int availableWidth = tableView.getWidth() - (10 * (4 + 1)); // padding و cardsPerRow=4
+        int cardWidth = availableWidth / 4;
+        int cardHeightPx = (int) (cardWidth * 1.5);
+
+        // بررسی مقادیر نامعتبر
+        if (cardWidth <= 0 || cardHeightPx <= 0 || tableView.getWidth() == 0) {
+            Log.w("animation", "Invalid table card size in createAnimatedCard, using default values: width=240, height=360");
+            cardWidth = (int) (120 * displayMetrics.density);
+            cardHeightPx = (int) (cardWidth * 1.5);
+        }
 
         ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(cardWidth, cardHeightPx);
         animatedCard.setLayoutParams(params);
