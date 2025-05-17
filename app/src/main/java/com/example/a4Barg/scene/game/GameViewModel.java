@@ -1,6 +1,8 @@
 package com.example.a4Barg.scene.game;
 
 import android.app.Application;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -91,6 +93,39 @@ public class GameViewModel extends AndroidViewModel {
             });
             SocketManager.sendRequest(getApplication(), request);
         } catch (JSONException e) {
+        }
+    }
+
+
+
+    public void sendPlayerReady(String gameId, String userId) {
+        if (!SocketManager.isConnect) {
+            Log.e("TEST", "sendPlayerReady failed: Socket not connected");
+            return;
+        }
+
+        try {
+            JSONObject data = new JSONObject();
+            data.put("event", "ready");
+            data.put("gameId", gameId);
+            data.put("userId", userId);
+
+            JSONObject requestData = new JSONObject();
+            requestData.put("data", data);
+
+            SharedPreferences prefs = getApplication().getSharedPreferences("auth", Context.MODE_PRIVATE);
+            String token = prefs.getString("token", null);
+            if (token != null) {
+                requestData.put("token", token);
+            } else {
+                Log.e("TEST", "sendPlayerReady failed: Authentication token missing");
+                return;
+            }
+
+            SocketManager.getSocket().emit("ready", requestData);
+            Log.d("TEST", "Player ready event sent: gameId=" + gameId + ", userId=" + userId);
+        } catch (JSONException e) {
+            Log.e("TEST", "sendPlayerReady JSON error: " + e.getMessage());
         }
     }
 

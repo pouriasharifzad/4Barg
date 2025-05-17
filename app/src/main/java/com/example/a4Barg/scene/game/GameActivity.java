@@ -20,14 +20,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.a4Barg.R;
 import com.example.a4Barg.common.BaseActivity;
 import com.example.a4Barg.model.Card;
-import com.example.a4Barg.model.InGameMessage;
 import com.example.a4Barg.networking.SocketManager;
 import com.example.a4Barg.utils.CardContainerView;
 import com.example.a4Barg.utils.CollectedCardsView;
@@ -72,8 +70,8 @@ public class GameActivity extends BaseActivity {
         viewModel = new ViewModelProvider(this).get(GameViewModel.class);
         userId = getIntent().getStringExtra("userId");
         roomNumber = getIntent().getStringExtra("roomNumber");
+        gameId = getIntent().getStringExtra("gameId");
         viewModel.setUserId(userId);
-
         rootLayout = findViewById(R.id.layout);
         userHandView = findViewById(R.id.user_handView);
         opponentHandView = findViewById(R.id.opponent_handView);
@@ -93,34 +91,45 @@ public class GameActivity extends BaseActivity {
         btnInGameMessage = findViewById(R.id.btnInGameMessage);
         tvUserInGameMessage = findViewById(R.id.tvUserInGameMessage);
         tvOpponentInGameMessage = findViewById(R.id.tvOpponentInGameMessage);
-
         userHandView.setType(CardContainerView.Type.HAND);
         opponentHandView.setType(CardContainerView.Type.HAND);
         tableView.setType(CardContainerView.Type.TABLE);
-
         userHandView.setShowCards(true);
         opponentHandView.setShowCards(false);
 
-        userHandView.setOnCardPlayedListener(new CardContainerView.OnCardPlayedListener() {
+        rootLayout.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
-            public void onCardPlayed(Card card, float dropX, float dropY, float rotation) {
-                clearAllBlinkingSelections();
-                tableView.clearHighlights();
-                viewModel.setPendingCard(card);
-                List<Card> tableCards = tableView.getCards();
-                int playedValue = getCardValue(card.getRank());
-                List<List<Card>> combinations = findCombinations(tableCards, playedValue);
+            public void onGlobalLayout() {
+                // حذف لیسنر برای جلوگیری از فراخوانی‌های مکرر
+                rootLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                Log.d("GameActivity", "XML layout fully loaded: width=" + rootLayout.getWidth() + ", height=" + rootLayout.getHeight());
 
-                if (combinations.isEmpty()) {
-                    viewModel.playCard(card, new ArrayList<>());
-                } else if (combinations.size() == 1) {
-                    viewModel.playCard(card, combinations.get(0));
-                } else {
-                    tableView.setSelectable(true);
-                    showOptions(combinations);
-                }
-                viewModel.setLastDropPosition(dropX, dropY, rotation);
+                // بررسی اندازه چند ویوی کلیدی
+                Log.d("GameActivity", "tableView: width=" + tableView.getWidth() + ", height=" + tableView.getHeight());
+                Log.d("GameActivity", "userHandView: width=" + userHandView.getWidth() + ", height=" + userHandView.getHeight());
+
+                // اینجا می‌توانید اقدامات لازم (مثلاً ارسال player_ready) را انجام دهید
+                viewModel.sendPlayerReady(gameId, userId);
             }
+        });
+
+        userHandView.setOnCardPlayedListener((card, dropX, dropY, rotation) -> {
+            clearAllBlinkingSelections();
+            tableView.clearHighlights();
+            viewModel.setPendingCard(card);
+            List<Card> tableCards = tableView.getCards();
+            int playedValue = getCardValue(card.getRank());
+            List<List<Card>> combinations = findCombinations(tableCards, playedValue);
+
+            if (combinations.isEmpty()) {
+                viewModel.playCard(card, new ArrayList<>());
+            } else if (combinations.size() == 1) {
+                viewModel.playCard(card, combinations.get(0));
+            } else {
+                tableView.setSelectable(true);
+                showOptions(combinations);
+            }
+            viewModel.setLastDropPosition(dropX, dropY, rotation);
         });
 
         tableView.setOnCardSelectedListener(card -> {

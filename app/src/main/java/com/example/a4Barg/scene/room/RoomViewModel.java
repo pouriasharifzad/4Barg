@@ -24,6 +24,7 @@ import java.util.Map;
 public class RoomViewModel extends AndroidViewModel {
 
     private String userId;
+    private String gameId; // اضافه کردن متغیر برای ذخیره gameId
     private MutableLiveData<List<Player>> players = new MutableLiveData<>(new ArrayList<>());
     private MutableLiveData<String> errorMessage = new MutableLiveData<>();
     private MutableLiveData<String> roomNumber = new MutableLiveData<>();
@@ -39,6 +40,11 @@ public class RoomViewModel extends AndroidViewModel {
 
     public void setUserId(String userId) {
         this.userId = userId;
+        Log.d("TEST", "setUserId: userId=" + userId);
+    }
+
+    public String getGameId() {
+        return gameId; // متد برای دسترسی به gameId
     }
 
     public MutableLiveData<List<Player>> getPlayers() {
@@ -76,9 +82,14 @@ public class RoomViewModel extends AndroidViewModel {
                     if (!isError && object.has("success") && object.getBoolean("success")) {
                         roomDetails.postValue(object);
                         isRoomDetailsLoaded = true;
-                        if (object.has("room") && object.getJSONObject("room").has("roomNumber")) {
-                            String updatedRoomNumber = object.getJSONObject("room").getString("roomNumber");
+                        if (object.has("room")) {
+                            JSONObject room = object.getJSONObject("room");
+                            String updatedRoomNumber = room.getString("roomNumber");
                             RoomViewModel.this.roomNumber.postValue(updatedRoomNumber);
+                            if (room.has("gameId")) {
+                                gameId = room.getString("gameId"); // ذخیره gameId
+                                Log.d("TEST", "Game ID loaded: " + gameId);
+                            }
                             Log.d("TEST", "Room details loaded for roomNumber: " + updatedRoomNumber + ", full response: " + object.toString());
                         } else {
                             Log.w("TEST", "roomNumber not found in response: " + object.toString());

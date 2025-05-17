@@ -91,7 +91,7 @@ public class RoomActivity extends BaseActivity {
                     roomNumberTextView.setText("شماره روم: " + roomNum);
                     minExperienceTextView.setText("حداقل تجربه: " + minExp);
                     minCoinsTextView.setText("حداقل سکه: " + minCoin);
-                    Log.d("TEST", "Room details updated: roomNumber=" + roomNum + ", minExperience=" + minExp + ", minCoins=" + minCoin);
+                    Log.d("TEST", "Room details updated: roomNumber=" + roomNum + ", minExperience=" + minExp + ", minCoins=" + minCoin + ", gameId=" + viewModel.getGameId());
 
                     updateStartGameButtonState();
                 } catch (JSONException e) {
@@ -202,6 +202,7 @@ public class RoomActivity extends BaseActivity {
                 intent.putExtra("roomNumber", roomNumber);
                 intent.putExtra("userId", userId);
                 intent.putExtra("isHost", isHost);
+                intent.putExtra("gameId", viewModel.getGameId()); // ارسال gameId به GameActivity
                 startActivity(intent);
                 finish();
             }
@@ -216,7 +217,6 @@ public class RoomActivity extends BaseActivity {
                     String receivedRoomNumber = data.getString("roomNumber");
                     if (receivedRoomNumber.equals(roomNumber)) {
                         runOnUiThread(() -> startCountdown());
-
                     }
                 } catch (JSONException e) {
                     runOnUiThread(() -> Toast.makeText(RoomActivity.this, "خطا در پردازش پیام بارگذاری بازی", Toast.LENGTH_SHORT).show());
