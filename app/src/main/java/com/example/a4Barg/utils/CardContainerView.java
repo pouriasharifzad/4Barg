@@ -2,6 +2,8 @@ package com.example.a4Barg.utils;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -54,7 +56,7 @@ public class CardContainerView extends ConstraintLayout {
     private float tableCardWidth = 0f;
     private float tableCardHeight = 0f;
 
-    private boolean isInitialAnimationPending = false; // پرچم جدید برای انیمیشن اولیه
+    private boolean isInitialAnimationPending = false; // پرچم برای انیمیشن اولیه
 
     public CardContainerView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -88,16 +90,15 @@ public class CardContainerView extends ConstraintLayout {
             }
             if (type == Type.HAND) {
                 setupDragAndDrop(cardView, card);
-            } else if (type == Type.TABLE && isSelectable) {
-                cardView.setOnClickListener(v -> {
-                    if (onCardSelectedListener != null) {
-                        onCardSelectedListener.onCardSelected(card);
-                    }
-                });
             }
             cardViews.add(cardView);
             cards.add(card);
             addView(cardView);
+        }
+
+        // اطمینان از تنظیم شنونده‌های کلیک پس از اضافه کردن کارت‌ها
+        if (type == Type.TABLE) {
+            setSelectable(isSelectable);
         }
 
         // اگر در حال انیمیشن اولیه هستیم، از چیدن کارت‌ها جلوگیری می‌کنیم
@@ -137,11 +138,22 @@ public class CardContainerView extends ConstraintLayout {
     public void setSelectable(boolean selectable) {
         if (type == Type.TABLE) {
             this.isSelectable = selectable;
-            for (ImageView cardView : cardViews) {
-                cardView.setOnClickListener(selectable && onCardSelectedListener != null ?
-                        v -> onCardSelectedListener.onCardSelected(cards.get(cardViews.indexOf(cardView))) : null);
-            }
-            requestLayout();
+            Log.d("CardContainerView", "Setting selectable: " + selectable + ", cards: " + cards.size());
+            // استفاده از Handler برای اطمینان از چیدمان کامل قبل از تنظیم شنونده‌ها
+            new Handler(Looper.getMainLooper()).post(() -> ensureClickListeners());
+        }
+    }
+
+    private void ensureClickListeners() {
+        Log.d("CardContainerView", "Ensuring click listeners, selectable: " + isSelectable + ", cards: " + cards.size());
+        for (int i = 0; i < cardViews.size(); i++) {
+            ImageView cardView = cardViews.get(i);
+            Card card = cards.get(i);
+            cardView.setOnClickListener(isSelectable && onCardSelectedListener != null ?
+                    v -> {
+                        Log.d("CardContainerView", "Card clicked: " + card.toString() + ", selectable: " + isSelectable);
+                        onCardSelectedListener.onCardSelected(card);
+                    } : null);
         }
     }
 
@@ -154,6 +166,8 @@ public class CardContainerView extends ConstraintLayout {
     public void setOnCardSelectedListener(OnCardSelectedListener listener) {
         if (type == Type.TABLE) {
             this.onCardSelectedListener = listener;
+            // به‌روزرسانی شنونده‌های کلیک برای کارت‌های موجود
+            setSelectable(isSelectable);
         }
     }
 
@@ -198,7 +212,6 @@ public class CardContainerView extends ConstraintLayout {
         }
     }
 
-    // متدهای جدید برای مدیریت پرچم انیمیشن اولیه
     public void setInitialAnimationPending(boolean pending) {
         this.isInitialAnimationPending = pending;
         if (!pending) {
@@ -271,7 +284,6 @@ public class CardContainerView extends ConstraintLayout {
     }
 
     private void layoutTable() {
-        // اگر انیمیشن اولیه در حال انجام است، چیدن کارت‌ها را انجام نمی‌دهیم
         if (isInitialAnimationPending) {
             Log.d("TableLayout", "Skipping layoutTable due to pending initial animation");
             return;
@@ -335,6 +347,11 @@ public class CardContainerView extends ConstraintLayout {
         lastCardPosition[0] = startX + (nextColumn * (cardWidth + horizontalSpacing));
         lastCardPosition[1] = startY + (nextRow * (cardHeightPx + verticalSpacing));
         Log.d("TableLayout", "Last card position: x=" + lastCardPosition[0] + ", y=" + lastCardPosition[1]);
+
+        // اطمینان از تنظیم شنونده‌های کلیک پس از چیدمان
+        if (type == Type.TABLE) {
+            ensureClickListeners();
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")

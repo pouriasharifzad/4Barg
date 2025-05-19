@@ -58,6 +58,7 @@ public class GameViewModel extends AndroidViewModel {
     private List<Card> pendingTableCardsUpdate = null;
     private final List<JSONObject> pendingPlayedCardEvents = new ArrayList<>();
     private final List<JSONObject> pendingGameStateUpdates = new ArrayList<>();
+    private boolean isAutomaticPlay = false; // Flag for automatic play
 
     public GameViewModel(Application application) {
         super(application);
@@ -65,10 +66,16 @@ public class GameViewModel extends AndroidViewModel {
 
     public void setActivity(GameActivity activity) {
         this.activity = activity;
+        Log.d("GameViewModel", "Activity set for GameViewModel");
     }
 
     public void setUserId(String userId) {
         this.userId = userId;
+        Log.d("GameViewModel", "UserId set to: " + userId);
+    }
+
+    public String getUserId() {
+        return userId;
     }
 
     public void startGame(String roomNumber) {
@@ -84,19 +91,20 @@ public class GameViewModel extends AndroidViewModel {
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
                     if (object.getBoolean("success")) {
                         gameId = object.getString("gameId");
+                        Log.d("GameViewModel", "Game started, gameId: " + gameId);
                     }
                 }
 
                 @Override
                 public void onError(Throwable t) {
+                    Log.e("GameViewModel", "Error starting game: " + t.getMessage());
                 }
             });
             SocketManager.sendRequest(getApplication(), request);
         } catch (JSONException e) {
+            Log.e("GameViewModel", "Error creating start_game JSON: " + e.getMessage());
         }
     }
-
-
 
     public void sendPlayerReady(String gameId, String userId) {
         if (!SocketManager.isConnect) {
@@ -144,20 +152,24 @@ public class GameViewModel extends AndroidViewModel {
 
                 @Override
                 public void onError(Throwable t) {
+                    Log.e("GameViewModel", "Error requesting player cards: " + t.getMessage());
                 }
             });
             SocketManager.sendRequest(getApplication(), request);
         } catch (JSONException e) {
+            Log.e("GameViewModel", "Error creating get_player_cards JSON: " + e.getMessage());
         }
     }
 
     public void setupGameListeners(GameActivity activity) {
         this.activity = activity;
+        Log.d("GameViewModel", "Setting up game listeners with userId: " + userId);
         SocketManager.addPlayerCardsListener(new SocketManager.PlayerCardsListener() {
             @Override
             public void onPlayerCards(JSONObject data) {
                 try {
                     String receivedUserId = data.getString("userId");
+                    Log.d("GameViewModel", "Received player_cards for userId: " + receivedUserId);
                     if (receivedUserId.equals(userId)) {
                         JSONArray cardsArray = data.getJSONArray("cards");
                         List<Card> cards = new ArrayList<>();
@@ -182,6 +194,7 @@ public class GameViewModel extends AndroidViewModel {
                         }
                     }
                 } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing player_cards: " + e.getMessage());
                 }
             }
 
@@ -204,6 +217,7 @@ public class GameViewModel extends AndroidViewModel {
 
             @Override
             public void onGameStateUpdateError(Throwable t) {
+                Log.e("GameViewModel", "Error receiving game state update: " + t.getMessage());
             }
         });
 
@@ -238,6 +252,7 @@ public class GameViewModel extends AndroidViewModel {
                                         }
                                         playersInfoRequested = true;
                                     } catch (JSONException e) {
+                                        Log.e("GameViewModel", "Error parsing game players info: " + e.getMessage());
                                     }
                                 }
 
@@ -249,11 +264,13 @@ public class GameViewModel extends AndroidViewModel {
                         }
                     }
                 } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing game start: " + e.getMessage());
                 }
             }
 
             @Override
             public void onGameStartError(Throwable t) {
+                Log.e("GameViewModel", "Error receiving game start: " + t.getMessage());
             }
         });
 
@@ -283,6 +300,7 @@ public class GameViewModel extends AndroidViewModel {
                         });
                     }
                 } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing select_combination: " + e.getMessage());
                 }
             }
         });
@@ -310,6 +328,7 @@ public class GameViewModel extends AndroidViewModel {
                         });
                     }
                 } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing select_king_or_queen: " + e.getMessage());
                 }
             }
         });
@@ -339,12 +358,30 @@ public class GameViewModel extends AndroidViewModel {
                         String suit = cardObj.getString("suit");
                         String value = cardObj.getString("value");
                         Card playedCard = new Card(suit, value);
+
+                        // Validate userId before processing
+                        if (userId == null || userId.isEmpty()) {
+                            Log.e("GameViewModel", "userId is null or empty, cannot process played_card event");
+                            isAnimating = false;
+                            return;
+                        }
+
                         boolean isUser = playerId.equals(userId);
+                        Log.d("GameViewModel", "Processing played_card: playerId=" + playerId + ", userId=" + userId + ", isUser=" + isUser + ", card=" + playedCard.toString());
                         boolean isCollected = data.optBoolean("isCollected", false);
                         List<Card> tableCardsToCollect = new ArrayList<>();
                         if (data.has("tableCards")) {
                             JSONArray tableCardsArray = data.getJSONArray("tableCards");
                             tableCardsToCollect = parseCards(tableCardsArray);
+                        }
+
+                        // Set isAutomaticPlay flag for user-initiated automatic play
+                        if (isUser && lastDropX == 0f && lastDropY == 0f) {
+                            isAutomaticPlay = true;
+                            Log.d("GameViewModel", "Detected automatic play for user: " + playedCard.toString());
+                        } else if (isUser) {
+                            isAutomaticPlay = false;
+                            Log.d("GameViewModel", "Detected manual play for user: " + playedCard.toString());
                         }
 
                         isAnimating = true;
@@ -511,6 +548,7 @@ public class GameViewModel extends AndroidViewModel {
                 activity.runOnUiThread(() -> Log.d("GameViewModel", "Sur event triggered!"));
             }
         } catch (JSONException e) {
+            Log.e("GameViewModel", "Error parsing game_state_update: " + e.getMessage());
         }
     }
 
@@ -623,6 +661,12 @@ public class GameViewModel extends AndroidViewModel {
         this.lastDropX = x;
         this.lastDropY = y;
         this.lastDropRotation = rotation;
+        this.isAutomaticPlay = false; // Reset for manual play
+        Log.d("GameViewModel", "Last drop position set: x=" + x + ", y=" + y + ", rotation=" + rotation);
+    }
+
+    public boolean isAutomaticPlay() {
+        return isAutomaticPlay;
     }
 
     public void setPendingCard(Card card) {

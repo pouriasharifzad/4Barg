@@ -30,6 +30,9 @@ import com.example.a4Barg.networking.SocketManager;
 import com.example.a4Barg.utils.CardContainerView;
 import com.example.a4Barg.utils.CollectedCardsView;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -71,6 +74,7 @@ public class GameActivity extends BaseActivity {
         userId = getIntent().getStringExtra("userId");
         roomNumber = getIntent().getStringExtra("roomNumber");
         gameId = getIntent().getStringExtra("gameId");
+        Log.d("GameActivity", "onCreate: userId=" + userId + ", gameId=" + gameId + ", roomNumber=" + roomNumber);
         viewModel.setUserId(userId);
         rootLayout = findViewById(R.id.layout);
         userHandView = findViewById(R.id.user_handView);
@@ -97,18 +101,17 @@ public class GameActivity extends BaseActivity {
         userHandView.setShowCards(true);
         opponentHandView.setShowCards(false);
 
+        // Set initial visibility of collected cards to GONE
+        userCollectedCardsView.setVisibility(View.GONE);
+        opponentCollectedCardsView.setVisibility(View.GONE);
+
         rootLayout.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             @Override
             public void onGlobalLayout() {
-                // حذف لیسنر برای جلوگیری از فراخوانی‌های مکرر
                 rootLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
                 Log.d("GameActivity", "XML layout fully loaded: width=" + rootLayout.getWidth() + ", height=" + rootLayout.getHeight());
-
-                // بررسی اندازه چند ویوی کلیدی
                 Log.d("GameActivity", "tableView: width=" + tableView.getWidth() + ", height=" + tableView.getHeight());
                 Log.d("GameActivity", "userHandView: width=" + userHandView.getWidth() + ", height=" + userHandView.getHeight());
-
-                // اینجا می‌توانید اقدامات لازم (مثلاً ارسال player_ready) را انجام دهید
                 viewModel.sendPlayerReady(gameId, userId);
             }
         });
@@ -133,6 +136,7 @@ public class GameActivity extends BaseActivity {
         });
 
         tableView.setOnCardSelectedListener(card -> {
+            Log.d("GameActivity", "Card selected: " + card.toString() + ", pendingCard: " + (viewModel.getPendingCard() != null ? viewModel.getPendingCard().toString() : "null"));
             if (viewModel.getPendingCard() == null) {
                 Log.w("GameActivity", "Card selected but no pending card!");
                 return;
@@ -151,6 +155,23 @@ public class GameActivity extends BaseActivity {
                 return;
             }
 
+            // بررسی حالت select_king_or_queen
+            List<List<Card>> possibleOptions = viewModel.getPossibleOptions().getValue();
+            boolean isKingOrQueenSelection = possibleOptions != null && !possibleOptions.isEmpty() && possibleOptions.get(0).size() == 1;
+
+            if (isKingOrQueenSelection) {
+                // برای حالت انتخاب King یا Queen، مستقیماً گزینه را انتخاب کنید
+                List<Card> selectedOption = new ArrayList<>();
+                selectedOption.add(card);
+                clearAllBlinkingSelections();
+                tableView.setSelectable(false);
+                tableView.clearHighlights();
+                viewModel.selectOption(selectedOption);
+                Log.d("GameActivity", "Selected option for king/queen: " + card.toString());
+                return;
+            }
+
+            // منطق انتخاب برای ترکیب‌های عددی
             if (selectedTableCards.contains(card)) {
                 selectedTableCards.remove(card);
                 stopBlinkingGreen(cardView);
@@ -187,6 +208,7 @@ public class GameActivity extends BaseActivity {
         btnInGameMessage.setOnClickListener(v -> showMessageDialog());
 
         SocketManager.initialize(this, userId);
+        viewModel.setActivity(this);
         viewModel.setupGameListeners(this);
 
         viewModel.startGame(roomNumber);
@@ -221,7 +243,7 @@ public class GameActivity extends BaseActivity {
         viewModel.getOpponentInfo().observe(this, info -> {
             opponentUsername.setText(info[0]);
             opponentExp.setText("EXP: " + info[1]);
-            opponentCoins.setText("Coins: " + info[2]);
+            userCoins.setText("Coins: " + info[2]);
         });
         viewModel.getUserSurs().observe(this, surs -> userSurs.setText("Surs: " + surs));
         viewModel.getOpponentSurs().observe(this, surs -> opponentSurs.setText("Surs: " + surs));
@@ -250,6 +272,20 @@ public class GameActivity extends BaseActivity {
                 } else {
                     showMessage(tvOpponentInGameMessage, message.getMessage());
                 }
+            }
+        });
+
+        // Add listener for turn timer updates
+        SocketManager.addCustomListener("turn_timer_update", data -> {
+            try {
+                String receivedGameId = data.getString("gameId");
+                if (receivedGameId.equals(gameId)) {
+                    String turnUserId = data.getString("userId");
+                    int remainingTime = data.getInt("remainingTime");
+                    runOnUiThread(() -> updateTurnIndicator(turnUserId, remainingTime));
+                }
+            } catch (JSONException e) {
+                Log.e("GameActivity", "Error processing turn_timer_update: " + e.getMessage());
             }
         });
     }
@@ -372,6 +408,7 @@ public class GameActivity extends BaseActivity {
     }
 
     public void showOptions(List<List<Card>> options) {
+        Log.d("GameActivity", "Showing options, count: " + options.size());
         tableView.clearHighlights();
         List<Card> collectableCards = new ArrayList<>();
         for (List<Card> option : options) {
@@ -392,6 +429,11 @@ public class GameActivity extends BaseActivity {
         if (!collectableCards.isEmpty()) {
             Log.d("GameActivity", "Highlighting options (alpha blink): " + collectableCards.size());
             tableView.highlightCards(collectableCards, Color.argb(0, 0, 0, 0));
+            // اطمینان از تنظیم selectable پس از چیدمان کامل
+            tableView.post(() -> {
+                tableView.setSelectable(true);
+                Log.d("GameActivity", "Table set to selectable after layout");
+            });
         } else {
             Log.d("GameActivity", "No options to highlight (or they are already selected).");
         }
@@ -427,9 +469,13 @@ public class GameActivity extends BaseActivity {
                 if (count > 0) {
                     for (int i = 0; i < count; i++) {
                         ImageView cardView = (ImageView) userHandView.getChildAt(i);
-                        Log.d("HandCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
-                        Log.d("HandCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
-                        Log.d("HandCards", "Card " + i + " rotation: " + cardView.getRotation());
+                        if (cardView != null) {
+                            Log.d("HandCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                            Log.d("HandCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                            Log.d("HandCards", "Card " + i + " rotation: " + cardView.getRotation());
+                        } else {
+                            Log.w("HandCards", "Card " + i + " view is null");
+                        }
                     }
                 }
             });
@@ -468,42 +514,56 @@ public class GameActivity extends BaseActivity {
                         int screenWidth = tableView.getWidth();
                         int screenHeight = tableView.getHeight();
                         Log.d("TableCards", "TableView dimensions after layout: width=" + screenWidth + ", height=" + screenHeight);
-                        tableView.setCards(tableCards);
+                        synchronizeTableViewCards(tableCards);
                         Log.d("TableCards", "Cards laid out in tableView");
                         float[] lastCardPos = tableView.getLastCardPosition();
                         Log.d("TableCards", "Last card position: x=" + lastCardPos[0] + ", y=" + lastCardPos[1]);
-                        tableView.post(() -> {
-                            int count = tableView.getCards().size();
-                            if (count > 0) {
-                                for (int i = 0; i < count; i++) {
-                                    ImageView cardView = (ImageView) tableView.getChildAt(i);
-                                    Log.d("TableCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
-                                    Log.d("TableCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
-                                }
-                            }
-                        });
+                        logTableCardPositions();
                     }
                 });
             } else {
                 int screenWidth = tableView.getWidth();
                 int screenHeight = tableView.getHeight();
                 Log.d("TableCards", "TableView dimensions: width=" + screenWidth + ", height=" + screenHeight);
-                tableView.setCards(tableCards);
+                synchronizeTableViewCards(tableCards);
                 Log.d("TableCards", "Cards laid out in tableView");
                 float[] lastCardPos = tableView.getLastCardPosition();
                 Log.d("TableCards", "Last card position: x=" + lastCardPos[0] + ", y=" + lastCardPos[1]);
-                tableView.post(() -> {
-                    int count = tableView.getCards().size();
-                    if (count > 0) {
-                        for (int i = 0; i < count; i++) {
-                            ImageView cardView = (ImageView) tableView.getChildAt(i);
-                            Log.d("TableCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
-                            Log.d("TableCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
-                        }
-                    }
-                });
+                logTableCardPositions();
             }
         }
+    }
+
+    private void synchronizeTableViewCards(List<Card> tableCards) {
+        int expectedCount = tableCards.size();
+        int actualCount = tableView.getChildCount();
+        if (actualCount != expectedCount) {
+            Log.w("TableCards", "Mismatch in tableView children: expected=" + expectedCount + ", actual=" + actualCount);
+            tableView.removeAllViews();
+            tableView.setCards(tableCards);
+        } else {
+            tableView.setCards(tableCards);
+        }
+    }
+
+    private void logTableCardPositions() {
+        tableView.post(() -> {
+            int count = tableView.getCards().size();
+            int childCount = tableView.getChildCount();
+            if (count != childCount) {
+                Log.w("TableCards", "Mismatch between card list and views: cards=" + count + ", views=" + childCount);
+            }
+            for (int i = 0; i < count && i < childCount; i++) {
+                View childView = tableView.getChildAt(i);
+                if (childView instanceof ImageView) {
+                    ImageView cardView = (ImageView) childView;
+                    Log.d("TableCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
+                    Log.d("TableCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                } else {
+                    Log.w("TableCards", "Card " + i + " view is not an ImageView or is null");
+                }
+            }
+        });
     }
 
     private void animateInitialTableCards(List<Card> initialCards) {
@@ -598,11 +658,18 @@ public class GameActivity extends BaseActivity {
 
                 tableView.post(() -> {
                     int count = tableView.getCards().size();
-                    if (count > 0) {
-                        for (int i = 0; i < count; i++) {
-                            ImageView cardView = (ImageView) tableView.getChildAt(i);
+                    int childCount = tableView.getChildCount();
+                    if (count != childCount) {
+                        Log.w("TableCards", "Mismatch after initial animation: cards=" + count + ", views=" + childCount);
+                    }
+                    for (int i = 0; i < count && i < childCount; i++) {
+                        View childView = tableView.getChildAt(i);
+                        if (childView instanceof ImageView) {
+                            ImageView cardView = (ImageView) childView;
                             Log.d("TableCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
                             Log.d("TableCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
+                        } else {
+                            Log.w("TableCards", "Card " + i + " view is not an ImageView or is null");
                         }
                     }
                 });
@@ -621,7 +688,7 @@ public class GameActivity extends BaseActivity {
     }
 
     private void animateInitialUserHandCards(List<Card> initialCards) {
-        if ( initialCards.size() != 4) {
+        if (initialCards.size() != 4) {
             Log.w("HandCards", "animateInitialUserHandCards called with incorrect number of cards: " + initialCards.size());
             return;
         }
@@ -714,12 +781,15 @@ public class GameActivity extends BaseActivity {
 
                 userHandView.post(() -> {
                     int count = userHandView.getCards().size();
-                    if (count > 0) {
-                        for (int i = 0; i < count; i++) {
-                            ImageView cardView = (ImageView) userHandView.getChildAt(i);
+                    for (int i = 0; i < count; i++) {
+                        View childView = userHandView.getChildAt(i);
+                        if (childView instanceof ImageView) {
+                            ImageView cardView = (ImageView) childView;
                             Log.d("HandCards", "Card " + i + " position: x=" + cardView.getX() + ", y=" + cardView.getY());
                             Log.d("HandCards", "Card " + i + " size: width=" + cardView.getWidth() + ", height=" + cardView.getHeight());
                             Log.d("HandCards", "Card " + i + " rotation: " + cardView.getRotation());
+                        } else {
+                            Log.w("HandCards", "Card " + i + " view is not an ImageView or is null");
                         }
                     }
                 });
@@ -732,10 +802,12 @@ public class GameActivity extends BaseActivity {
 
     private void updateUserCollectedCards(List<Card> cards) {
         userCollectedCardsView.setCards(cards);
+        userCollectedCardsView.setVisibility(cards != null && !cards.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
     private void updateOpponentCollectedCards(List<Card> cards) {
         opponentCollectedCardsView.setCards(cards);
+        opponentCollectedCardsView.setVisibility(cards != null && !cards.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
     private void updateTurnIndicator(String turnUserId) {
@@ -744,6 +816,20 @@ public class GameActivity extends BaseActivity {
             userHandView.setEnabled(true);
         } else {
             turnIndicator.setText("نوبت حریف");
+            userHandView.setEnabled(false);
+            clearAllBlinkingSelections();
+            tableView.setSelectable(false);
+        }
+    }
+
+    private void updateTurnIndicator(String turnUserId, int remainingTime) {
+        String text = turnUserId.equals(userId) ?
+                "نوبت شما: " + remainingTime + " ثانیه" :
+                "نوبت حریف: " + remainingTime + " ثانیه";
+        turnIndicator.setText(text);
+        if (turnUserId.equals(userId)) {
+            userHandView.setEnabled(true);
+        } else {
             userHandView.setEnabled(false);
             clearAllBlinkingSelections();
             tableView.setSelectable(false);
@@ -763,15 +849,42 @@ public class GameActivity extends BaseActivity {
     }
 
     public void animateCard(Card playedCard, boolean isUser, float startX, float startY, float startRotation, List<Card> tableCardsToCollect, Runnable onAnimationEnd) {
-        Log.d("animation", "Starting animateCard - Played Card: " + playedCard.toString() + ", Played by: " + (isUser ? "User" : "Opponent"));
-        Log.d("animation", "Source Position - Title: " + (isUser ? "User Hand (Drop Location)" : "Opponent Hand Center") + ", Coordinates: (" + startX + ", " + startY + "), Rotation: " + startRotation);
+        Log.d("animation", "Starting animateCard - Played Card: " + playedCard.toString() + ", Played by: " + (isUser ? "User" : "Opponent") + ", isAutomaticPlay: " + viewModel.isAutomaticPlay());
+        Log.d("animation", "Initial Source Position - Title: " + (isUser ? "User Hand (Drop Location)" : "Opponent Hand Center") + ", Coordinates: (" + startX + ", " + startY + "), Rotation: " + startRotation);
         Log.d("animation", "Cards to Collect: " + (tableCardsToCollect == null ? "None" : tableCardsToCollect.toString()));
+
+        // For automatic play by user, get the card's position from userHandView
+        if (isUser && viewModel.isAutomaticPlay()) {
+            int cardIndex = userHandView.getCards().indexOf(playedCard);
+            if (cardIndex != -1 && cardIndex < userHandView.getChildCount()) {
+                View childView = userHandView.getChildAt(cardIndex);
+                if (childView instanceof ImageView) {
+                    ImageView cardView = (ImageView) childView;
+                    int[] location = new int[2];
+                    cardView.getLocationOnScreen(location);
+                    int[] rootLocation = new int[2];
+                    rootLayout.getLocationOnScreen(rootLocation);
+                    startX = location[0] - rootLocation[0];
+                    startY = location[1] - rootLocation[1];
+                    startRotation = cardView.getRotation();
+                    Log.d("animation", "Adjusted Source Position for Automatic Play - Card: " + playedCard.toString() + ", Coordinates: (" + startX + ", " + startY + "), Rotation: " + startRotation);
+                } else {
+                    Log.w("animation", "Card view at index " + cardIndex + " is not an ImageView for card: " + playedCard.toString());
+                }
+            } else {
+                Log.w("animation", "Card not found in userHandView or view not rendered for card: " + playedCard.toString());
+                // Fallback to center of userHandView
+                startX = userHandView.getX() + userHandView.getWidth() / 2f;
+                startY = userHandView.getY() + userHandView.getHeight() / 2f;
+                startRotation = 0f;
+                Log.d("animation", "Using fallback position - Center of userHandView: (" + startX + ", " + startY + ")");
+            }
+        }
 
         float[] tableCardSize = tableView.getTableCardSize();
         float targetWidth = tableCardSize[0];
         float targetHeight = tableCardSize[1];
 
-        // بررسی مقادیر نامعتبر و استفاده از مقادیر پیش‌فرض
         if (targetWidth <= 0 || targetHeight <= 0 || Float.isNaN(targetWidth) || Float.isNaN(targetHeight)) {
             Log.w("animation", "Invalid table card size, using default values: width=240, height=360");
             targetWidth = 240f;
@@ -781,15 +894,13 @@ public class GameActivity extends BaseActivity {
 
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
         float tableAspectRatio = targetWidth / targetHeight;
-        // بررسی tableAspectRatio برای جلوگیری از NaN
         if (Float.isNaN(tableAspectRatio) || tableAspectRatio <= 0) {
             Log.w("animation", "Invalid tableAspectRatio, using default value: 0.6667");
-            tableAspectRatio = 0.6667f; // نسبت عرض به ارتفاع پیش‌فرض (240/360)
+            tableAspectRatio = 0.6667f;
         }
 
         float handCardHeight = (int) (138 * displayMetrics.density);
         float handCardWidth = handCardHeight * tableAspectRatio;
-        // بررسی handCardWidth برای جلوگیری از NaN
         if (Float.isNaN(handCardWidth) || handCardWidth <= 0) {
             Log.w("animation", "Invalid handCardWidth, using default value: 240");
             handCardWidth = 240f;
@@ -810,6 +921,9 @@ public class GameActivity extends BaseActivity {
             float finalTargetWidth = targetWidth;
             float finalHandCardWidth = handCardWidth;
             float finalTargetHeight = targetHeight;
+            float finalStartX = startX;
+            float finalStartY = startY;
+            float finalStartRotation = startRotation;
             tableView.post(() -> {
                 float[] lastCardPosition = tableView.getLastCardPosition();
                 float endX = tableView.getX() + lastCardPosition[0];
@@ -822,16 +936,15 @@ public class GameActivity extends BaseActivity {
                 float finalHeight = handCardHeight * scaleY;
                 Log.d("dimen", "Played card final size (on table): width=" + finalWidth + ", height=" + finalHeight);
 
-                // بررسی مقادیر NaN یا نامعتبر برای scaleX و scaleY
                 if (Float.isNaN(scaleX) || Float.isNaN(scaleY) || scaleX <= 0 || scaleY <= 0) {
                     Log.w("animation", "Invalid scale values, using default scale: 1.0");
                     scaleX = 1.0f;
                     scaleY = 1.0f;
                 }
 
-                ObjectAnimator moveX = ObjectAnimator.ofFloat(animatedCard, "x", startX, endX);
-                ObjectAnimator moveY = ObjectAnimator.ofFloat(animatedCard, "y", startY, endY);
-                ObjectAnimator rotate = ObjectAnimator.ofFloat(animatedCard, "rotation", startRotation, 0f);
+                ObjectAnimator moveX = ObjectAnimator.ofFloat(animatedCard, "x", finalStartX, endX);
+                ObjectAnimator moveY = ObjectAnimator.ofFloat(animatedCard, "y", finalStartY, endY);
+                ObjectAnimator rotate = ObjectAnimator.ofFloat(animatedCard, "rotation", finalStartRotation, 0f);
                 ObjectAnimator scaleXAnimator = ObjectAnimator.ofFloat(animatedCard, "scaleX", 1f, scaleX);
                 ObjectAnimator scaleYAnimator = ObjectAnimator.ofFloat(animatedCard, "scaleY", 1f, scaleY);
 
@@ -891,13 +1004,21 @@ public class GameActivity extends BaseActivity {
             float lastX = startX;
             float lastY = startY;
 
-            float finalScaleX = userCollectedCardsView.getWidth() / handCardWidth;
-            float finalScaleY = userCollectedCardsView.getHeight() / handCardHeight;
+            View collectedView = isUser ? userCollectedCardsView : opponentCollectedCardsView;
+            // Ensure collectedView has valid dimensions
+            if (collectedView.getWidth() == 0 || collectedView.getHeight() == 0) {
+                collectedView.post(() -> {
+                    Log.d("animation", "Collected view dimensions after layout: width=" + collectedView.getWidth() + ", height=" + collectedView.getHeight());
+                });
+                Log.w("animation", "Collected view has invalid dimensions, using default scale: 1.0");
+            }
+
+            float finalScaleX = collectedView.getWidth() > 0 ? collectedView.getWidth() / handCardWidth : 1.0f;
+            float finalScaleY = collectedView.getHeight() > 0 ? collectedView.getHeight() / handCardHeight : 1.0f;
             float finalWidth = handCardWidth * finalScaleX;
             float finalHeight = handCardHeight * finalScaleY;
             Log.d("dimen", "Played card final size (in collected cards): width=" + finalWidth + ", height=" + finalHeight);
 
-            // بررسی مقادیر NaN یا نامعتبر برای finalScaleX و finalScaleY
             if (Float.isNaN(finalScaleX) || Float.isNaN(finalScaleY) || finalScaleX <= 0 || finalScaleY <= 0) {
                 Log.w("animation", "Invalid final scale values, using default scale: 1.0");
                 finalScaleX = 1.0f;
@@ -917,8 +1038,8 @@ public class GameActivity extends BaseActivity {
                 float overlapY = tableCardLocation[1] - rootLocation[1];
                 Log.d("animation", "Step " + (i + 1) + ": Moving to overlap position for card: " + tableCard.toString() + ", Target: (" + overlapX + ", " + overlapY + ")");
 
-                displayMetrics = getResources().getDisplayMetrics();
-                int cardWidth = (int) (120 * displayMetrics.density);
+                DisplayMetrics metrics = getResources().getDisplayMetrics();
+                int cardWidth = (int) (120 * metrics.density);
                 float offsetX = cardWidth * 0.2f;
                 overlapX += offsetX;
 
@@ -932,7 +1053,6 @@ public class GameActivity extends BaseActivity {
                     if (cardView == playedCardView) {
                         float scaleX = targetWidth / handCardWidth;
                         float scaleY = targetHeight / handCardHeight;
-                        // بررسی مقادیر NaN یا نامعتبر
                         if (Float.isNaN(scaleX) || Float.isNaN(scaleY) || scaleX <= 0 || scaleY <= 0) {
                             Log.w("animation", "Invalid scale values for played card, using default scale: 1.0");
                             scaleX = 1.0f;
@@ -967,7 +1087,6 @@ public class GameActivity extends BaseActivity {
                         tableCardView.setY(overlapY);
                         float scaleX = finalTargetWidth1 / finalHandCardWidth1;
                         float scaleY = finalTargetHeight1 / handCardHeight;
-                        // بررسی مقادیر NaN یا نامعتبر
                         if (Float.isNaN(scaleX) || Float.isNaN(scaleY) || scaleX <= 0 || scaleY <= 0) {
                             Log.w("animation", "Invalid scale values for table card, using default scale: 1.0");
                             scaleX = 1.0f;
@@ -984,14 +1103,36 @@ public class GameActivity extends BaseActivity {
                 lastY = overlapY;
             }
 
-            View collectedView = isUser ? userCollectedCardsView : opponentCollectedCardsView;
             int[] collectedLocation = new int[2];
-            collectedView.getLocationOnScreen(collectedLocation);
             int[] rootLocation = new int[2];
             rootLayout.getLocationOnScreen(rootLocation);
 
+            // Ensure collectedView is laid out before getting location
+            if (collectedView.getWidth() == 0 || collectedView.getHeight() == 0) {
+                Log.w("animation", "Collected view not yet laid out, forcing measure and layout");
+                collectedView.measure(View.MeasureSpec.makeMeasureSpec(rootLayout.getWidth(), View.MeasureSpec.AT_MOST),
+                        View.MeasureSpec.makeMeasureSpec(rootLayout.getHeight(), View.MeasureSpec.AT_MOST));
+                collectedView.layout(0, 0, collectedView.getMeasuredWidth(), collectedView.getMeasuredHeight());
+            }
+
+            collectedView.getLocationOnScreen(collectedLocation);
+
             float collectedX = collectedLocation[0] - rootLocation[0] + collectedView.getWidth() / 2f - playedCardView.getWidth() / 2f;
             float collectedY = collectedLocation[1] - rootLocation[1] + collectedView.getHeight() / 2f - playedCardView.getHeight() / 2f;
+
+            // Fallback positions if coordinates are invalid
+            if (collectedX == 0 && collectedY == 0) {
+                Log.w("animation", "Invalid collected coordinates, using fallback position for " + (isUser ? "User" : "Opponent") + " Collected Cards");
+                if (isUser) {
+                    collectedX = rootLayout.getWidth() - collectedView.getWidth() - 20; // Right side
+                    collectedY = rootLayout.getHeight() - collectedView.getHeight() - 20; // Bottom
+                } else {
+                    collectedX = 20; // Left side
+                    collectedY = 20; // Top
+                }
+                Log.d("animation", "Fallback position set: (" + collectedX + ", " + collectedY + ")");
+            }
+
             Log.d("animation", "Final Destination - Title: " + (isUser ? "User Collected Cards" : "Opponent Collected Cards") + ", Coordinates: (" + collectedX + ", " + collectedY + ")");
 
             List<ObjectAnimator> finalAnimators = new ArrayList<>();
@@ -1038,13 +1179,14 @@ public class GameActivity extends BaseActivity {
                     Log.d("animation", "Final animation to collected cards completed.");
                     for (ImageView cardView : collectedCardViews) {
                         rootLayout.removeView(cardView);
-                        Log.d("animation", "Removed card from rootLayout: " + (cardView == playedCardView ? playedCard.toString() : tableCardsToCollect.get(collectedCardViews.indexOf(cardView) - 1).toString()));
+                        String cardName = (cardView == playedCardView) ? playedCard.toString() : tableCardsToCollect.get(collectedCardViews.indexOf(cardView) - 1).toString();
+                        Log.d("animation", "Removed card from rootLayout: " + cardName);
                     }
-                    for (int i = 0; i < tableView.getChildCount(); i++) {
+                    for (int i = tableView.getChildCount() - 1; i >= 0; i--) {
                         View child = tableView.getChildAt(i);
                         if (child instanceof ImageView) {
                             tableView.removeView(child);
-                            Log.d("animation", "Removed leftover view from tableView");
+                            Log.d("animation", "Removed leftover view from table GLO");
                         }
                     }
                     if (onAnimationEnd != null) {
@@ -1065,12 +1207,10 @@ public class GameActivity extends BaseActivity {
         animatedCard.setImageResource(resId != 0 ? resId : R.drawable.card_back);
 
         DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
-        // استفاده از ابعاد سازگار با CardContainerView.layoutTable
-        int availableWidth = tableView.getWidth() - (10 * (4 + 1)); // padding و cardsPerRow=4
+        int availableWidth = tableView.getWidth() - (10 * (4 + 1));
         int cardWidth = availableWidth / 4;
         int cardHeightPx = (int) (cardWidth * 1.5);
 
-        // بررسی مقادیر نامعتبر
         if (cardWidth <= 0 || cardHeightPx <= 0 || tableView.getWidth() == 0) {
             Log.w("animation", "Invalid table card size in createAnimatedCard, using default values: width=240, height=360");
             cardWidth = (int) (120 * displayMetrics.density);
@@ -1088,7 +1228,7 @@ public class GameActivity extends BaseActivity {
 
     private ImageView findTableCardView(Card tableCard) {
         int index = tableView.getCards().indexOf(tableCard);
-        if (index != -1) {
+        if (index != -1 && index < tableView.getChildCount()) {
             View childView = tableView.getChildAt(index);
             if (childView instanceof ImageView) {
                 return (ImageView) childView;
