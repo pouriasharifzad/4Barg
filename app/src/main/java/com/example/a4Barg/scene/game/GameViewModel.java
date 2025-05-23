@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class GameViewModel extends AndroidViewModel {
 
@@ -58,7 +59,12 @@ public class GameViewModel extends AndroidViewModel {
     private List<Card> pendingTableCardsUpdate = null;
     private final List<JSONObject> pendingPlayedCardEvents = new ArrayList<>();
     private final List<JSONObject> pendingGameStateUpdates = new ArrayList<>();
-    private boolean isAutomaticPlay = false; // Flag for automatic play
+    private boolean isAutomaticPlay = false;
+
+    public enum DialogType {
+        EXIT,
+        RETURN_TO_LOBBY
+    }
 
     public GameViewModel(Application application) {
         super(application);
@@ -138,27 +144,90 @@ public class GameViewModel extends AndroidViewModel {
     }
 
     public void requestPlayerCards(String gameId) {
+        requestPlayerCards(gameId, 0, 5);
+    }
+
+    private void requestPlayerCards(String gameId, int attempt, int maxRetries) {
+        if (attempt >= maxRetries) {
+            Log.e("GameViewModel", "Max retries reached for get_player_cards request");
+            activity.runOnUiThread(() -> activity.showError("خطا در دریافت کارت‌ها: عدم پاسخ سرور پس از چندین تلاش", null));
+            return;
+        }
+
+        if (!SocketManager.isConnect) {
+            Log.e("GameViewModel", "Socket not connected, attempting reconnect before get_player_cards request");
+            SocketManager.reconnectIfNeeded();
+        }
+
         Map<String, Object> dataMap = new HashMap<>();
         dataMap.put("gameId", gameId);
         dataMap.put("userId", userId);
         dataMap.put("event", "get_player_cards");
+        dataMap.put("id", UUID.randomUUID().toString());
 
         try {
             JSONObject data = new JSONObject(dataMap);
             SocketRequest request = new SocketRequest(null, data, new SocketManager.Response() {
                 @Override
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    Log.d("GameViewModel", "Received get_player_cards response: success=" + !isError);
                 }
 
                 @Override
                 public void onError(Throwable t) {
-                    Log.e("GameViewModel", "Error requesting player cards: " + t.getMessage());
+                    Log.e("GameViewModel", "Error requesting player cards (attempt " + (attempt + 1) + "): " + t.getMessage());
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        requestPlayerCards(gameId, attempt + 1, maxRetries);
+                    }, 1000);
                 }
             });
             SocketManager.sendRequest(getApplication(), request);
+            Log.d("GameViewModel", "Sent get_player_cards request (attempt " + (attempt + 1) + "), socket connected: " + SocketManager.isConnect);
         } catch (JSONException e) {
             Log.e("GameViewModel", "Error creating get_player_cards JSON: " + e.getMessage());
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                requestPlayerCards(gameId, attempt + 1, maxRetries);
+            }, 1000);
         }
+    }
+
+    public void sendInitialAnimationComplete(String gameId, String userId) {
+        if (!SocketManager.isConnect) {
+            Log.e("GameViewModel", "Socket not connected, cannot send initial_animation_complete");
+            return;
+        }
+
+        try {
+            JSONObject data = new JSONObject();
+            data.put("event", "initial_animation_complete");
+            data.put("gameId", gameId);
+            data.put("userId", userId);
+            data.put("id", UUID.randomUUID().toString());
+
+            SocketRequest request = new SocketRequest(null, data, new SocketManager.Response() {
+                @Override
+                public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    Log.d("GameViewModel", "Received initial_animation_complete response: success=" + !isError);
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    Log.e("GameViewModel", "Error sending initial_animation_complete: " + t.getMessage());
+                }
+            });
+            SocketManager.sendRequest(getApplication(), request);
+            Log.d("GameViewModel", "Sent initial_animation_complete request for gameId: " + gameId);
+        } catch (JSONException e) {
+            Log.e("GameViewModel", "Error creating initial_animation_complete JSON: " + e.getMessage());
+        }
+    }
+
+    public void showDisconnectDialog(String message, DialogType dialogType) {
+        activity.runOnUiThread(() -> {
+            activity.showError(message, dialogType);
+            gameOver.setValue(true);
+            gameResultText.setValue(message);
+        });
     }
 
     public void setupGameListeners(GameActivity activity) {
@@ -274,6 +343,25 @@ public class GameViewModel extends AndroidViewModel {
             }
         });
 
+        SocketManager.addCustomListener("player_disconnected", new SocketManager.CustomListener() {
+            @Override
+            public void onEvent(JSONObject data) {
+                try {
+                    String disconnectedUserId = data.getString("userId");
+                    String reason = data.getString("reason");
+                    Log.d("GameViewModel", "Player disconnected: userId=" + disconnectedUserId + ", reason=" + reason);
+
+                    if (disconnectedUserId.equals(userId) && reason.equals("repeated inactivity")) {
+                        showDisconnectDialog("به دلیل قطع اتصال بازی رو باختید", DialogType.EXIT);
+                    } else if (!disconnectedUserId.equals(userId) && reason.equals("repeated inactivity")) {
+                        showDisconnectDialog("به دلیل قطع ارتباط حریف شما برنده شدید", DialogType.RETURN_TO_LOBBY);
+                    }
+                } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing player_disconnected: " + e.getMessage());
+                }
+            }
+        });
+
         SocketManager.addCustomListener("select_combination", new SocketManager.CustomListener() {
             @Override
             public void onEvent(JSONObject data) {
@@ -359,7 +447,6 @@ public class GameViewModel extends AndroidViewModel {
                         String value = cardObj.getString("value");
                         Card playedCard = new Card(suit, value);
 
-                        // Validate userId before processing
                         if (userId == null || userId.isEmpty()) {
                             Log.e("GameViewModel", "userId is null or empty, cannot process played_card event");
                             isAnimating = false;
@@ -375,7 +462,6 @@ public class GameViewModel extends AndroidViewModel {
                             tableCardsToCollect = parseCards(tableCardsArray);
                         }
 
-                        // Set isAutomaticPlay flag for user-initiated automatic play
                         if (isUser && lastDropX == 0f && lastDropY == 0f) {
                             isAutomaticPlay = true;
                             Log.d("GameViewModel", "Detected automatic play for user: " + playedCard.toString());
@@ -398,6 +484,7 @@ public class GameViewModel extends AndroidViewModel {
                         }
                         activity.animateCard(playedCard, isUser, startX, startY, startRotation, tableCardsToCollect, () -> {
                             isAnimating = false;
+                            processPlayedCardAfterAnimation(data);
                             processPendingEvents();
                         });
                     } catch (JSONException e) {
@@ -407,50 +494,167 @@ public class GameViewModel extends AndroidViewModel {
                 });
             }
         });
+
+        SocketManager.addCustomListener("initial_animation_complete_response", new SocketManager.CustomListener() {
+            @Override
+            public void onEvent(JSONObject data) {
+                try {
+                    String receivedGameId = data.getString("gameId");
+                    boolean success = data.getBoolean("success");
+                    Log.d("GameViewModel", "Received initial_animation_complete_response for gameId: " + receivedGameId + ", success: " + success);
+                    if (!success) {
+                        Log.e("GameViewModel", "Initial animation complete response failed: " + data.optString("message", "Unknown error"));
+                    }
+                } catch (JSONException e) {
+                    Log.e("GameViewModel", "Error parsing initial_animation_complete_response: " + e.getMessage());
+                }
+            }
+        });
     }
 
     private void processPendingEvents() {
-        // پردازش رویدادهای played_card
-        for (JSONObject data : new ArrayList<>(pendingPlayedCardEvents)) {
-            try {
-                String playerId = data.getString("userId");
-                JSONObject cardObj = data.getJSONObject("card");
-                String suit = cardObj.getString("suit");
-                String value = cardObj.getString("value");
-                Card playedCard = new Card(suit, value);
-                boolean isCollected = data.optBoolean("isCollected", false);
-                List<Card> tableCardsToCollect = new ArrayList<>();
-                if (data.has("tableCards")) {
-                    JSONArray tableCardsArray = data.getJSONArray("tableCards");
-                    tableCardsToCollect = parseCards(tableCardsArray);
-                }
-
-                if (isCollected) {
-                    List<Card> currentTableCards = tableCards.getValue();
-                    if (currentTableCards != null) {
-                        List<Card> updatedTableCards = new ArrayList<>(currentTableCards);
-                        updatedTableCards.removeAll(tableCardsToCollect);
-                        updatedTableCards.remove(playedCard);
-                        tableCards.setValue(updatedTableCards);
-                        Log.d("TableCards", "Table cards updated after collection: " + updatedTableCards.size() + " cards remaining");
-                    }
-                }
-                if (pendingTableCardsUpdate != null) {
-                    Log.d("TableCards", "Applying pending table cards update: " + pendingTableCardsUpdate.size() + " cards");
-                    tableCards.setValue(pendingTableCardsUpdate);
-                    pendingTableCardsUpdate = null;
-                }
-            } catch (JSONException e) {
-                Log.e("GameViewModel", "Error processing stored played_card event: " + e.getMessage());
-            }
-        }
-        pendingPlayedCardEvents.clear();
-
-        // پردازش رویدادهای game_state_update
         for (JSONObject data : new ArrayList<>(pendingGameStateUpdates)) {
             processGameStateUpdate(data);
         }
         pendingGameStateUpdates.clear();
+    }
+
+    private void processPlayedCardAfterAnimation(JSONObject data) {
+        try {
+            String playerId = data.getString("userId");
+            JSONObject cardObj = data.getJSONObject("card");
+            String suit = cardObj.getString("suit");
+            String value = cardObj.getString("value");
+            Card playedCard = new Card(suit, value);
+            boolean isCollected = data.optBoolean("isCollected", false);
+            boolean surEvent = data.optBoolean("surEvent", false);
+            List<Card> tableCardsToCollect = new ArrayList<>();
+            if (data.has("tableCards")) {
+                JSONArray tableCardsArray = data.getJSONArray("tableCards");
+                tableCardsToCollect = parseCards(tableCardsArray);
+            }
+
+            // به‌روزرسانی کارت‌های میز بلافاصله
+            List<Card> currentTableCards = tableCards.getValue() != null ? new ArrayList<>(tableCards.getValue()) : new ArrayList<>();
+            if (isCollected) {
+                currentTableCards.removeAll(tableCardsToCollect);
+                currentTableCards.remove(playedCard);
+                Log.d("TableCards", "Table cards updated after collection: " + currentTableCards.size() + " cards remaining");
+            } else {
+                currentTableCards.add(playedCard);
+                Log.d("TableCards", "Card added to table: " + playedCard.toString());
+            }
+            tableCards.setValue(currentTableCards);
+
+            // به‌روزرسانی کارت‌های جمع‌شده
+            boolean isUser = playerId.equals(userId);
+            if (isCollected) {
+                if (isUser) {
+                    List<Card> currentCollected = userCollectedCards.getValue() != null ? new ArrayList<>(userCollectedCards.getValue()) : new ArrayList<>();
+                    currentCollected.addAll(tableCardsToCollect);
+                    currentCollected.add(playedCard);
+                    userCollectedCards.setValue(currentCollected);
+                } else {
+                    List<Card> currentCollected = opponentCollectedCards.getValue() != null ? new ArrayList<>(opponentCollectedCards.getValue()) : new ArrayList<>();
+                    currentCollected.addAll(tableCardsToCollect);
+                    currentCollected.add(playedCard);
+                    opponentCollectedCards.setValue(currentCollected);
+                }
+            }
+
+            // به‌روزرسانی تعداد سور
+            if (surEvent) {
+                if (isUser) {
+                    userSurs.setValue(userSurs.getValue() != null ? userSurs.getValue() + 1 : 1);
+                } else {
+                    opponentSurs.setValue(opponentSurs.getValue() != null ? opponentSurs.getValue() + 1 : 1);
+                }
+                Log.d("GameViewModel", "Sur event processed for player: " + playerId);
+            }
+
+            // حذف رویداد از لیست در انتظار
+            pendingPlayedCardEvents.remove(data);
+
+            // ارسال درخواست continue_game به سرور برای ادامه بازی
+            long startTime = System.currentTimeMillis();
+            Log.d("GameViewModel", "Animation completed for card: " + playedCard.toString() + ", sending continue_game request at " + startTime);
+            sendContinueGameRequest(data, 5, 0, startTime);
+
+        } catch (JSONException e) {
+            Log.e("GameViewModel", "Error processing played_card after animation: " + e.getMessage());
+            activity.showError("خطا در پردازش کارت: " + e.getMessage(), null);
+            requestPlayerCards(gameId);
+        }
+    }
+
+    private void sendContinueGameRequest(JSONObject playedCardData, int maxRetries, int attempt, long startTime) {
+        if (attempt >= maxRetries) {
+            Log.e("GameViewModel", "Max retries reached for continue_game request after " + (System.currentTimeMillis() - startTime) + "ms");
+            activity.showError("خطا در ادامه بازی: عدم پاسخ سرور پس از چندین تلاش", null);
+            requestPlayerCards(gameId);
+            return;
+        }
+
+        if (!SocketManager.isConnect) {
+            Log.e("GameViewModel", "Socket not connected, attempting reconnect before continue_game request");
+            SocketManager.reconnectIfNeeded();
+            if (!SocketManager.isConnect) {
+                Log.e("GameViewModel", "Reconnect failed, retrying continue_game request");
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    sendContinueGameRequest(playedCardData, maxRetries, attempt + 1, startTime);
+                }, 1000);
+                return;
+            }
+        }
+
+        try {
+            Map<String, Object> dataMap = new HashMap<>();
+            dataMap.put("gameId", gameId);
+            dataMap.put("userId", userId);
+            dataMap.put("event", "continue_game");
+            dataMap.put("id", UUID.randomUUID().toString());
+
+            JSONObject requestData = new JSONObject(dataMap);
+            SocketRequest request = new SocketRequest(null, requestData, new SocketManager.Response() {
+                @Override
+                public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    long responseTime = System.currentTimeMillis();
+                    Log.d("GameViewModel", "Received continue_game response: success=" + !isError + ", message=" + object.optString("message", "Unknown") + ", took " + (responseTime - startTime) + "ms");
+                    if (!isError && object.getBoolean("success")) {
+                        if (object.has("tableCards")) {
+                            JSONArray tableCardsArray = object.getJSONArray("tableCards");
+                            List<Card> cards = new ArrayList<>();
+                            for (int i = 0; i < tableCardsArray.length(); i++) {
+                                JSONObject cardObj = tableCardsArray.getJSONObject(i);
+                                cards.add(new Card(cardObj.getString("suit"), cardObj.getString("value")));
+                            }
+                            new Handler(Looper.getMainLooper()).post(() -> {
+                                tableCards.setValue(cards);
+                                Log.d("TableCards", "Table cards updated from continue_game response: " + cards.size() + " cards");
+                            });
+                        }
+                    } else {
+                        Log.e("GameViewModel", "Continue game failed: " + (isError ? "Error" : object.optString("message", "Unknown")));
+                        activity.showError("خطا در ادامه بازی: " + object.optString("message", "لطفاً دوباره تلاش کنید."), null);
+                        requestPlayerCards(gameId);
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    Log.e("GameViewModel", "Continue game error (attempt " + (attempt + 1) + "): " + t.getMessage() + ", after " + (System.currentTimeMillis() - startTime) + "ms");
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        sendContinueGameRequest(playedCardData, maxRetries, attempt + 1, startTime);
+                    }, 1000);
+                }
+            });
+            SocketManager.sendRequest(getApplication(), request);
+            Log.d("GameViewModel", "Sent continue_game request (attempt " + (attempt + 1) + "), socket connected: " + SocketManager.isConnect);
+        } catch (JSONException e) {
+            Log.e("GameViewModel", "Error creating continue_game JSON: " + e.getMessage());
+            activity.showError("خطا در پردازش درخواست ادامه بازی: " + e.getMessage(), null);
+            requestPlayerCards(gameId);
+        }
     }
 
     private void processGameStateUpdate(JSONObject data) {
@@ -487,8 +691,16 @@ public class GameViewModel extends AndroidViewModel {
                         }
                     }
                     String winnerId = data.getString("winner");
+                    String reason = data.optString("reason", "");
                     winner.setValue(winnerId);
-                    String winnerMessage = winnerId.equals(userId) ? "شما برنده شدید!" : "حریف شما برنده شد!";
+                    String winnerMessage;
+                    if (reason.equals("repeated inactivity")) {
+                        winnerMessage = winnerId.equals(userId) ?
+                                "به دلیل قطع ارتباط حریف شما برنده شدید!" :
+                                "به دلیل قطع اتصال بازی رو باختید!";
+                    } else {
+                        winnerMessage = winnerId.equals(userId) ? "شما برنده شدید!" : "حریف شما برنده شد!";
+                    }
                     String resultText = String.format(
                             "بازی تموم شد!\nامتیاز شما: %d\nامتیاز حریف: %d\n%s",
                             userScoreValue, opponentScoreValue, winnerMessage
@@ -512,6 +724,7 @@ public class GameViewModel extends AndroidViewModel {
             }
             if (data.has("currentTurn")) {
                 currentTurn.setValue(data.getString("currentTurn"));
+                Log.d("GameViewModel", "Updated currentTurn to: " + data.getString("currentTurn"));
             }
             if (data.has("collectedCards")) {
                 JSONArray collected = data.getJSONArray("collectedCards");
@@ -568,7 +781,7 @@ public class GameViewModel extends AndroidViewModel {
         }
         if (gameId == null || gameId.isEmpty()) {
             Log.e("GameViewModel", "gameId is null or empty, cannot play card");
-            activity.showError("بازی پیدا نشد. لطفاً دوباره تلاش کنید.");
+            activity.showError("بازی پیدا نشد. لطفاً دوباره تلاش کنید.", null);
             return;
         }
         StringBuilder collectLog = new StringBuilder("Collecting cards: ");
@@ -582,6 +795,7 @@ public class GameViewModel extends AndroidViewModel {
             data.put("gameId", gameId);
             data.put("userId", userId);
             data.put("card", new JSONObject().put("suit", card.getSuit()).put("value", card.getRank()));
+            data.put("id", UUID.randomUUID().toString());
             if (tableCardsToCollect == null || tableCardsToCollect.isEmpty()) {
                 data.put("isAddToTable", true);
             } else {
@@ -594,8 +808,8 @@ public class GameViewModel extends AndroidViewModel {
             SocketRequest request = new SocketRequest(null, data, new SocketManager.Response() {
                 @Override
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    Log.d("GameViewModel", "Received play_card response: success=" + !isError);
                     if (!isError && object.getBoolean("success")) {
-                        Log.d("GameViewModel", "Play card successful, resetting pendingCard and options");
                         new Handler(Looper.getMainLooper()).post(() -> {
                             pendingCard = null;
                             setPossibleOptions(null);
@@ -605,7 +819,7 @@ public class GameViewModel extends AndroidViewModel {
                         new Handler(Looper.getMainLooper()).post(() -> {
                             pendingCard = null;
                             setPossibleOptions(null);
-                            activity.showError("خطا در ارسال درخواست به سرور: " + object.optString("message", "لطفاً دوباره تلاش کنید."));
+                            activity.showError("خطا در ارسال درخواست به سرور: " + object.optString("message", "لطفاً دوباره تلاش کنید."), null);
                         });
                     }
                 }
@@ -616,17 +830,18 @@ public class GameViewModel extends AndroidViewModel {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         pendingCard = null;
                         setPossibleOptions(null);
-                        activity.showError("خطا در ارسال درخواست به سرور. لطفاً دوباره تلاش کنید.");
+                        activity.showError("خطا در ارسال درخواست به سرور: " + t.getMessage(), null);
                     });
                 }
             });
             SocketManager.sendRequest(getApplication(), request);
+            Log.d("GameViewModel", "Sent play_card request, socket connected: " + SocketManager.isConnect);
         } catch (JSONException e) {
             Log.e("GameViewModel", "Error creating play card JSON: " + e.getMessage());
             new Handler(Looper.getMainLooper()).post(() -> {
                 pendingCard = null;
                 setPossibleOptions(null);
-                activity.showError("خطا در پردازش درخواست. لطفاً دوباره تلاش کنید.");
+                activity.showError("خطا در پردازش درخواست: " + e.getMessage(), null);
             });
         }
     }
@@ -638,9 +853,11 @@ public class GameViewModel extends AndroidViewModel {
             data.put("gameId", gameId);
             data.put("userId", userId);
             data.put("message", message);
+            data.put("id", UUID.randomUUID().toString());
             SocketRequest request = new SocketRequest(null, data, new SocketManager.Response() {
                 @Override
                 public void onResponse(JSONObject object, Boolean isError) throws JSONException {
+                    Log.d("GameViewModel", "Received send_in_game_message response: success=" + !isError);
                     if (!isError && object.getBoolean("success")) {
                         inGameMessage.setValue(new InGameMessage(userId, message));
                     }
@@ -652,6 +869,7 @@ public class GameViewModel extends AndroidViewModel {
                 }
             });
             SocketManager.sendRequest(getApplication(), request);
+            Log.d("GameViewModel", "Sent send_in_game_message request, socket connected: " + SocketManager.isConnect);
         } catch (JSONException e) {
             Log.e("GameViewModel", "Error creating message JSON: " + e.getMessage());
         }
@@ -661,7 +879,7 @@ public class GameViewModel extends AndroidViewModel {
         this.lastDropX = x;
         this.lastDropY = y;
         this.lastDropRotation = rotation;
-        this.isAutomaticPlay = false; // Reset for manual play
+        this.isAutomaticPlay = false;
         Log.d("GameViewModel", "Last drop position set: x=" + x + ", y=" + y + ", rotation=" + rotation);
     }
 

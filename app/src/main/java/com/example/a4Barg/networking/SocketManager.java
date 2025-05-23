@@ -363,8 +363,12 @@ public class SocketManager {
         SocketManager.context = context;
         reconnectIfNeeded();
         if (!socket.connected() || !isConnect) {
-            request.getResponse().onError(new IllegalArgumentException("اتصال برقرار نشد"));
-            return;
+            Log.e("TEST", "Socket not connected, attempting reconnect before request: " + request.getJsonObject().toString());
+            reconnectIfNeeded();
+            if (!socket.connected()) {
+                request.getResponse().onError(new IllegalArgumentException("اتصال برقرار نشد"));
+                return;
+            }
         }
 
         SharedPreferences prefs = context.getSharedPreferences("auth", Context.MODE_PRIVATE);
@@ -391,24 +395,14 @@ public class SocketManager {
             return;
         }
 
-        final long TIMEOUT_MS = 15000; // افزایش تایم‌اوت به 15 ثانیه برای اطمینان بیشتر
+        final long TIMEOUT_MS = 30000; // تایم‌اوت 30 ثانیه
         final Handler timeoutHandler = new Handler(Looper.getMainLooper());
         final Runnable timeoutRunnable = () -> {
             synchronized (pendingRequests) {
                 pendingRequests.remove(requestKey);
             }
             request.getResponse().onError(new IllegalArgumentException("درخواست منقضی شد: پاسخی از سرور دریافت نشد"));
-            socket.off("message");
-            socket.off("login_response");
-            socket.off("register_response");
-            socket.off("create_room_response");
-            socket.off("join_room_response");
-            socket.off("leave_room_response");
-            socket.off("get_room_list_response");
-            socket.off("get_room_details_response");
-            socket.off("get_room_players_response");
-            socket.off("game_loading_response");
-            socket.off("play_card_response");
+            socket.off(event + "_response");
         };
         timeoutHandler.postDelayed(timeoutRunnable, TIMEOUT_MS);
 
@@ -519,7 +513,7 @@ public class SocketManager {
 
     private static void proceedWithGameLoading(Context context, SocketRequest request, Response response, String token, String requestKey) throws JSONException {
         String event = request.getJsonObject().getString("event");
-        final long TIMEOUT_MS = 15000; // افزایش تایم‌اوت به 15 ثانیه
+        final long TIMEOUT_MS = 30000; // تایم‌اوت 30 ثانیه
         final Handler timeoutHandler = new Handler(Looper.getMainLooper());
         final Runnable timeoutRunnable = () -> {
             synchronized (pendingRequests) {
@@ -611,7 +605,8 @@ public class SocketManager {
                         event.equals("get_friends_response") || event.equals("send_friend_request_response") ||
                         event.equals("accept_friend_request_response") || event.equals("reject_friend_request_response") ||
                         event.equals("send_private_message_response") || event.equals("receive_private_message") ||
-                        event.equals("get_missed_messages_response") || event.equals("load_messages_response")) {
+                        event.equals("get_missed_messages_response") || event.equals("load_messages_response") ||
+                        event.equals("continue_game_response") || event.equals("get_player_cards_response")) {
                     if (success) {
                         if (event.equals("login_response") || event.equals("register_response")) {
                             ConsValue.isRegistered = true;

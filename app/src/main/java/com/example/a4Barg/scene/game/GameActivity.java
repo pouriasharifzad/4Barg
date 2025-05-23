@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.os.Bundle;
@@ -27,6 +28,7 @@ import com.example.a4Barg.R;
 import com.example.a4Barg.common.BaseActivity;
 import com.example.a4Barg.model.Card;
 import com.example.a4Barg.networking.SocketManager;
+import com.example.a4Barg.scene.lobby.LobbyActivity;
 import com.example.a4Barg.utils.CardContainerView;
 import com.example.a4Barg.utils.CollectedCardsView;
 
@@ -64,6 +66,7 @@ public class GameActivity extends BaseActivity {
     private boolean isInitialTableCardsSet = false;
     private boolean isInitialUserHandSet = false;
     private boolean isTableAnimationComplete = false;
+    private boolean isInitialUserHandAnimationComplete = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -191,7 +194,7 @@ public class GameActivity extends BaseActivity {
                     tableView.clearHighlights();
                     viewModel.playCard(viewModel.getPendingCard(), cardsToPlay);
                 } else if (cardPlayedValue + currentSelectionValue > 11) {
-                    showError("مجموع " + (cardPlayedValue + currentSelectionValue) + " شد! ترکیب اشتباه است.");
+                    showError("مجموع " + (cardPlayedValue + currentSelectionValue) + " شد! ترکیب اشتباه است.", null);
                     clearAllBlinkingSelections();
                     tableView.setSelectable(true);
 
@@ -243,7 +246,7 @@ public class GameActivity extends BaseActivity {
         viewModel.getOpponentInfo().observe(this, info -> {
             opponentUsername.setText(info[0]);
             opponentExp.setText("EXP: " + info[1]);
-            userCoins.setText("Coins: " + info[2]);
+            opponentCoins.setText("Coins: " + info[2]);
         });
         viewModel.getUserSurs().observe(this, surs -> userSurs.setText("Surs: " + surs));
         viewModel.getOpponentSurs().observe(this, surs -> opponentSurs.setText("Surs: " + surs));
@@ -344,8 +347,38 @@ public class GameActivity extends BaseActivity {
         handler.postDelayed(() -> textView.setVisibility(View.GONE), 5000);
     }
 
-    public void showError(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    // متد اصلاح‌شده showError برای نمایش AlertDialog با دکمه
+    public void showError(String message, GameViewModel.DialogType dialogType) {
+        runOnUiThread(() -> {
+            AlertDialog.Builder builder = new AlertDialog.Builder(this);
+            builder.setMessage(message);
+            builder.setCancelable(false); // جلوگیری از بستن دیالوگ با کلیک خارج از آن
+
+            if (dialogType == GameViewModel.DialogType.EXIT) {
+                builder.setTitle("باخت بازی");
+                builder.setPositiveButton("خروج", (dialog, which) -> {
+                    Log.d("GameActivity", "Exit button clicked, finishing activity");
+                    finishAffinity();
+                    System.exit(0); // بستن فعالیت بازی
+                });
+            } else if (dialogType == GameViewModel.DialogType.RETURN_TO_LOBBY) {
+                builder.setTitle("برد بازی");
+                builder.setPositiveButton("بازگشت به لابی", (dialog, which) -> {
+                    Log.d("GameActivity", "Return to lobby button clicked, starting LobbyActivity");
+                    Intent intent = new Intent(GameActivity.this, LobbyActivity.class);
+                    intent.putExtra("userId", userId);
+                    startActivity(intent);
+                    finish(); // بستن فعالیت بازی پس از انتقال به لابی
+                });
+            } else {
+                // برای خطاهای عمومی بدون دکمه خاص
+                builder.setTitle("خطا");
+                builder.setPositiveButton("تأیید", (dialog, which) -> dialog.dismiss());
+            }
+
+            AlertDialog dialog = builder.create();
+            dialog.show();
+        });
     }
 
     private int getCardValue(String rank) {
@@ -778,6 +811,7 @@ public class GameActivity extends BaseActivity {
                 }
 
                 userHandView.setInitialAnimationPending(false);
+                isInitialUserHandAnimationComplete = true;
 
                 userHandView.post(() -> {
                     int count = userHandView.getCards().size();
@@ -793,11 +827,19 @@ public class GameActivity extends BaseActivity {
                         }
                     }
                 });
+
+                // Send initial animation complete request to server
+                sendInitialAnimationComplete();
             }
         });
 
         fullAnimatorSet.start();
         Log.d("HandCards", "Started animation for initial 4 cards");
+    }
+
+    private void sendInitialAnimationComplete() {
+        Log.d("GameActivity", "Sending initial_animation_complete request for gameId: " + gameId);
+        viewModel.sendInitialAnimationComplete(gameId, userId);
     }
 
     private void updateUserCollectedCards(List<Card> cards) {
@@ -1154,14 +1196,6 @@ public class GameActivity extends BaseActivity {
             animators.add(finalAnimatorSet);
             Log.d("animation", "Created final animation to collected cards");
 
-            for (int i = 0; i < animators.size(); i++) {
-                if (i == 0) {
-                    animatorSet.play(animators.get(i));
-                } else {
-                    animatorSet.play(animators.get(i)).after(animators.get(i - 1)).after(1000);
-                }
-            }
-
             finalAnimatorSet.addListener(new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationStart(Animator animation) {
@@ -1172,6 +1206,14 @@ public class GameActivity extends BaseActivity {
                     }
                 }
             });
+
+            for (int i = 0; i < animators.size(); i++) {
+                if (i == 0) {
+                    animatorSet.play(animators.get(i));
+                } else {
+                    animatorSet.play(animators.get(i)).after(animators.get(i - 1)).after(1000);
+                }
+            }
 
             animatorSet.addListener(new AnimatorListenerAdapter() {
                 @Override
