@@ -67,6 +67,7 @@ public class GameActivity extends BaseActivity {
     private boolean isInitialUserHandSet = false;
     private boolean isTableAnimationComplete = false;
     private boolean isInitialUserHandAnimationComplete = false;
+    private int dealCount = 0; // برای ردیابی تعداد دست‌های توزیع‌شده
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -347,19 +348,18 @@ public class GameActivity extends BaseActivity {
         handler.postDelayed(() -> textView.setVisibility(View.GONE), 5000);
     }
 
-    // متد اصلاح‌شده showError برای نمایش AlertDialog با دکمه
     public void showError(String message, GameViewModel.DialogType dialogType) {
         runOnUiThread(() -> {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setMessage(message);
-            builder.setCancelable(false); // جلوگیری از بستن دیالوگ با کلیک خارج از آن
+            builder.setCancelable(false);
 
             if (dialogType == GameViewModel.DialogType.EXIT) {
                 builder.setTitle("باخت بازی");
                 builder.setPositiveButton("خروج", (dialog, which) -> {
                     Log.d("GameActivity", "Exit button clicked, finishing activity");
                     finishAffinity();
-                    System.exit(0); // بستن فعالیت بازی
+                    System.exit(0);
                 });
             } else if (dialogType == GameViewModel.DialogType.RETURN_TO_LOBBY) {
                 builder.setTitle("برد بازی");
@@ -368,10 +368,9 @@ public class GameActivity extends BaseActivity {
                     Intent intent = new Intent(GameActivity.this, LobbyActivity.class);
                     intent.putExtra("userId", userId);
                     startActivity(intent);
-                    finish(); // بستن فعالیت بازی پس از انتقال به لابی
+                    finish();
                 });
             } else {
-                // برای خطاهای عمومی بدون دکمه خاص
                 builder.setTitle("خطا");
                 builder.setPositiveButton("تأیید", (dialog, which) -> dialog.dismiss());
             }
@@ -462,7 +461,6 @@ public class GameActivity extends BaseActivity {
         if (!collectableCards.isEmpty()) {
             Log.d("GameActivity", "Highlighting options (alpha blink): " + collectableCards.size());
             tableView.highlightCards(collectableCards, Color.argb(0, 0, 0, 0));
-            // اطمینان از تنظیم selectable پس از چیدمان کامل
             tableView.post(() -> {
                 tableView.setSelectable(true);
                 Log.d("GameActivity", "Table set to selectable after layout");
@@ -486,17 +484,25 @@ public class GameActivity extends BaseActivity {
             return;
         }
         Log.d("HandCards", "Cards to display: " + cards.toString());
-        if (cards.size() == 4 && userHandView.getCards().isEmpty() && !isInitialUserHandSet) {
+
+        // بررسی توزیع ۴ کارت جدید (دست اول یا دست‌های بعدی)
+        if (cards.size() == 4 && userHandView.getCards().isEmpty()) {
             userHandView.setInitialAnimationPending(true);
-            if (isTableAnimationComplete) {
-                animateInitialUserHandCards(cards);
-                isInitialUserHandSet = true;
+            dealCount++; // افزایش تعداد دست‌های توزیع‌شده
+            Log.d("HandCards", "Detected new deal (deal count: " + dealCount + "), preparing to animate cards");
+            if (dealCount == 1 && !isTableAnimationComplete) {
+                // برای دست اول، منتظر تکمیل انیمیشن میز می‌مانیم
+                Log.d("HandCards", "Waiting for table animation to complete before first hand animation");
             } else {
-                Log.d("HandCards", "Waiting for table animation to complete before user hand animation");
+                // برای دست اول پس از تکمیل انیمیشن میز یا دست‌های بعدی، انیمیشن را اجرا می‌کنیم
+                animateInitialUserHandCards(cards);
+                if (dealCount == 1) {
+                    isInitialUserHandSet = true; // برای دست اول
+                }
             }
         } else {
             userHandView.setCards(cards);
-            Log.d("HandCards", "Cards laid out in userHandView");
+            Log.d("HandCards", "Cards laid out in userHandView without animation");
             userHandView.post(() -> {
                 int count = userHandView.getCards().size();
                 if (count > 0) {
@@ -707,6 +713,7 @@ public class GameActivity extends BaseActivity {
                     }
                 });
 
+                // بررسی کارت‌های دست بازیکن برای دست اول
                 List<Card> userCards = viewModel.getUserCards().getValue();
                 if (userCards != null && userCards.size() == 4 && userHandView.getCards().isEmpty() && !isInitialUserHandSet) {
                     userHandView.setInitialAnimationPending(true);
@@ -801,7 +808,7 @@ public class GameActivity extends BaseActivity {
         fullAnimatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                Log.d("HandCards", "Initial cards animation completed");
+                Log.d("HandCards", "Cards animation completed for deal " + dealCount);
                 userHandView.setCards(initialCards);
                 Log.d("HandCards", "Cards laid out in userHandView after animation");
 
@@ -811,7 +818,6 @@ public class GameActivity extends BaseActivity {
                 }
 
                 userHandView.setInitialAnimationPending(false);
-                isInitialUserHandAnimationComplete = true;
 
                 userHandView.post(() -> {
                     int count = userHandView.getCards().size();
@@ -828,13 +834,16 @@ public class GameActivity extends BaseActivity {
                     }
                 });
 
-                // Send initial animation complete request to server
-                sendInitialAnimationComplete();
+                // ارسال درخواست initial_animation_complete فقط برای دست اول
+                if (dealCount == 1) {
+                    isInitialUserHandAnimationComplete = true;
+                    sendInitialAnimationComplete();
+                }
             }
         });
 
         fullAnimatorSet.start();
-        Log.d("HandCards", "Started animation for initial 4 cards");
+        Log.d("HandCards", "Started animation for 4 cards (deal " + dealCount + ")");
     }
 
     private void sendInitialAnimationComplete() {
@@ -895,7 +904,6 @@ public class GameActivity extends BaseActivity {
         Log.d("animation", "Initial Source Position - Title: " + (isUser ? "User Hand (Drop Location)" : "Opponent Hand Center") + ", Coordinates: (" + startX + ", " + startY + "), Rotation: " + startRotation);
         Log.d("animation", "Cards to Collect: " + (tableCardsToCollect == null ? "None" : tableCardsToCollect.toString()));
 
-        // For automatic play by user, get the card's position from userHandView
         if (isUser && viewModel.isAutomaticPlay()) {
             int cardIndex = userHandView.getCards().indexOf(playedCard);
             if (cardIndex != -1 && cardIndex < userHandView.getChildCount()) {
@@ -915,7 +923,6 @@ public class GameActivity extends BaseActivity {
                 }
             } else {
                 Log.w("animation", "Card not found in userHandView or view not rendered for card: " + playedCard.toString());
-                // Fallback to center of userHandView
                 startX = userHandView.getX() + userHandView.getWidth() / 2f;
                 startY = userHandView.getY() + userHandView.getHeight() / 2f;
                 startRotation = 0f;
@@ -1047,7 +1054,6 @@ public class GameActivity extends BaseActivity {
             float lastY = startY;
 
             View collectedView = isUser ? userCollectedCardsView : opponentCollectedCardsView;
-            // Ensure collectedView has valid dimensions
             if (collectedView.getWidth() == 0 || collectedView.getHeight() == 0) {
                 collectedView.post(() -> {
                     Log.d("animation", "Collected view dimensions after layout: width=" + collectedView.getWidth() + ", height=" + collectedView.getHeight());
@@ -1149,7 +1155,6 @@ public class GameActivity extends BaseActivity {
             int[] rootLocation = new int[2];
             rootLayout.getLocationOnScreen(rootLocation);
 
-            // Ensure collectedView is laid out before getting location
             if (collectedView.getWidth() == 0 || collectedView.getHeight() == 0) {
                 Log.w("animation", "Collected view not yet laid out, forcing measure and layout");
                 collectedView.measure(View.MeasureSpec.makeMeasureSpec(rootLayout.getWidth(), View.MeasureSpec.AT_MOST),
@@ -1162,15 +1167,14 @@ public class GameActivity extends BaseActivity {
             float collectedX = collectedLocation[0] - rootLocation[0] + collectedView.getWidth() / 2f - playedCardView.getWidth() / 2f;
             float collectedY = collectedLocation[1] - rootLocation[1] + collectedView.getHeight() / 2f - playedCardView.getHeight() / 2f;
 
-            // Fallback positions if coordinates are invalid
             if (collectedX == 0 && collectedY == 0) {
                 Log.w("animation", "Invalid collected coordinates, using fallback position for " + (isUser ? "User" : "Opponent") + " Collected Cards");
                 if (isUser) {
-                    collectedX = rootLayout.getWidth() - collectedView.getWidth() - 20; // Right side
-                    collectedY = rootLayout.getHeight() - collectedView.getHeight() - 20; // Bottom
+                    collectedX = rootLayout.getWidth() - collectedView.getWidth() - 20;
+                    collectedY = rootLayout.getHeight() - collectedView.getHeight() - 20;
                 } else {
-                    collectedX = 20; // Left side
-                    collectedY = 20; // Top
+                    collectedX = 20;
+                    collectedY = 20;
                 }
                 Log.d("animation", "Fallback position set: (" + collectedX + ", " + collectedY + ")");
             }
